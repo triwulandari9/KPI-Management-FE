@@ -1,5 +1,5 @@
 export { apiClient } from "./apiClient";
-export { authService, OFFICIAL_HR_ACCOUNTS } from "./authService";
+export { authService } from "./authService";
 export { dashboardService, FALLBACK_DASHBOARD_TASKS } from "./dashboardService";
 export { employeeService, FALLBACK_EMPLOYEES } from "./employeeService";
 export { taskService, FALLBACK_TASKS } from "./taskService";
