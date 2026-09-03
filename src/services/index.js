@@ -1,7 +1,8 @@
 export { apiClient } from "./apiClient";
 export { authService } from "./authService";
 export { dashboardService, FALLBACK_DASHBOARD_TASKS } from "./dashboardService";
-export { employeeService, FALLBACK_EMPLOYEES } from "./employeeService";
+export { employeeService } from "./employeeService";
+
 export { taskService, FALLBACK_TASKS } from "./taskService";
 export { calendarService, FALLBACK_EVENTS } from "./calendarService";
 export { departmentService, FALLBACK_DEPARTMENTS } from "./departmentService";

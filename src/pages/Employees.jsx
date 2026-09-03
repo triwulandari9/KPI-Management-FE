@@ -17,14 +17,14 @@ import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { employeeService, FALLBACK_EMPLOYEES } from "../services/employeeService";
+import { employeeService } from "../services/employeeService";
 
 export default function Employees() {
   const { collapsed } = useSidebar();
   const { currentUser } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
-  const [employees, setEmployees] = useState(FALLBACK_EMPLOYEES);
+  const [employees, setEmployees] = useState([]);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
