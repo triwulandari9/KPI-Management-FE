@@ -23,7 +23,7 @@ import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { taskService, FALLBACK_TASKS } from "../services/taskService";
+import { taskService } from "../services/taskService";
 
 // Nilai Poin Standar Sesuai Catatan Mentor / ClickUp
 const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
@@ -50,7 +50,7 @@ export default function Tasks() {
   const { currentUser } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
-  const [tasks, setTasks] = useState(FALLBACK_TASKS);
+  const [tasks, setTasks] = useState([]);
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isModalOpen, setIsModalOpen] = useState(false);
