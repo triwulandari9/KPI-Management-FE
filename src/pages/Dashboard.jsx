@@ -21,7 +21,7 @@ import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { dashboardService, FALLBACK_DASHBOARD_TASKS } from "../services/dashboardService";
+import { dashboardService } from "../services/dashboardService";
 
 // Nilai Poin Standar Sesuai Catatan Mentor / ClickUp
 const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const isHR = currentUser?.role?.toUpperCase() === "HR";
   const userName = currentUser?.name || (isHR ? "Admin HR" : "Sari");
 
-  const [taskList, setTaskList] = useState(FALLBACK_DASHBOARD_TASKS);
+  const [taskList, setTaskList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);

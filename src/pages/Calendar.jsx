@@ -15,7 +15,7 @@ import {
 import Header from "../layouts/Header";
 import Sidebar from "../layouts/Sidebar";
 import { useSidebar } from "../context/SidebarContext";
-import { calendarService, FALLBACK_EVENTS } from "../services/calendarService";
+import { calendarService } from "../services/calendarService";
 
 const DAYS_OF_WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MONTH_NAMES = [
@@ -30,7 +30,7 @@ export default function CalendarPage() {
   const [viewType, setViewType] = useState("Month");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [teamFilter, setTeamFilter] = useState("All Teams");
-  const [events, setEvents] = useState(FALLBACK_EVENTS);
+  const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
