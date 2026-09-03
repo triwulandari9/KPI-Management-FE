@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FaFileExcel,
   FaUserTie,
@@ -12,6 +12,7 @@ import {
   FaEdit,
   FaSave,
   FaCalendarAlt,
+  FaSpinner,
 } from "react-icons/fa";
 
 import Header from "../layouts/Header";
@@ -20,7 +21,9 @@ import PageHeader from "../layouts/PageHeader";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { kpiService } from "../services/kpiService";
+import { employeeService } from "../services/employeeService";
 import * as XLSX from "xlsx";
+
 
 // Daftar 10+ Tab Bulan / Periode
 const MONTH_TABS = [
@@ -165,19 +168,108 @@ const KPI_METRICS_TEMPLATE = [
 export default function KpiTracking() {
   const { collapsed } = useSidebar();
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState("Januari");
+  const isHR = currentUser?.role?.toUpperCase() === "HR";
+
+  const [employeesList, setEmployeesList] = useState([]);
+  const [activeTab, setActiveTab] = useState("Agustus");
   const [selectedYear, setSelectedYear] = useState("2026");
-  const [selectedEmp, setSelectedEmp] = useState("EMP-001");
+  const [selectedEmp, setSelectedEmp] = useState("");
   const [exportNotification, setExportNotification] = useState(false);
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingEvaluation, setIsLoadingEvaluation] = useState(false);
+  const [beEvaluation, setBeEvaluation] = useState(null);
 
   // State Input Real-Time Karyawan untuk Setiap Rumus KPI
   const [kpiInputs, setKpiInputs] = useState(DEFAULT_INPUTS);
 
-  const isHR = currentUser?.role?.toUpperCase() === "HR";
+  // Load Real Employees from Backend
+  useEffect(() => {
+    async function loadEmployees() {
+      try {
+        const data = await employeeService.getEmployees();
+        if (Array.isArray(data) && data.length > 0) {
+          setEmployeesList(data);
+          if (isHR) {
+            setSelectedEmp((prev) => prev || data[0]._id || data[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Gagal load employees:", err);
+      }
+    }
+    loadEmployees();
+  }, [isHR]);
+
   const currentEmployee = isHR
-    ? EMPLOYEES.find((e) => e.id === selectedEmp) || EMPLOYEES[0]
-    : { id: "EMP-001", name: currentUser?.name || "Sari Wulandari", role: "Frontend Developer" };
+    ? employeesList.find((e) => (e._id || e.id) === selectedEmp) || employeesList[0] || {
+        id: currentUser?._id || currentUser?.id || "EMP-001",
+        name: currentUser?.name || "Admin HR",
+        role: "HR",
+      }
+    : {
+        id: currentUser?._id || currentUser?.id || "EMP-001",
+        _id: currentUser?._id || currentUser?.id || "EMP-001",
+        name: currentUser?.name || "Karyawan",
+        role: currentUser?.position || currentUser?.role || "Karyawan",
+      };
+
+  const targetEmpId = currentEmployee._id || currentEmployee.id;
+  const monthNumber = MONTH_TABS.indexOf(activeTab) + 1;
+
+  // Load evaluation from BE
+  const loadKpiEvaluation = useCallback(async () => {
+    if (!targetEmpId) return;
+    setIsLoadingEvaluation(true);
+    try {
+      const cacheKey = `kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          setKpiInputs(JSON.parse(cached));
+        } catch {
+          // ignore error
+        }
+      }
+
+      const res = await kpiService.getKpiEvaluations({
+        empId: targetEmpId,
+        month: monthNumber,
+        year: Number(selectedYear),
+      });
+      const evalData = res?.data || res;
+      setBeEvaluation(evalData);
+
+      if (evalData?.scores && Array.isArray(evalData.scores) && !cached) {
+        const newInputs = { ...DEFAULT_INPUTS };
+        evalData.scores.forEach((s) => {
+          const name = (s.indicatorName || "").toLowerCase();
+          if (name.includes("sprint") || name.includes("story point")) {
+            newInputs[8] = { spEarned: s.actual || 0, spTarget: s.target || 88 };
+          } else if (name.includes("on time") || name.includes("delivery")) {
+            const act = s.actual || 90;
+            newInputs[1] = { onTime: Math.round((act / 100) * 10), total: 10 };
+          } else if (name.includes("sla") || name.includes("bug ticket")) {
+            const act = s.actual || 90;
+            newInputs[2] = { onSla: Math.round((act / 100) * 20), total: 20 };
+          } else if (name.includes("qa") || name.includes("backward")) {
+            const act = s.actual || 0;
+            newInputs[7] = { rejectCount: Math.round((act / 100) * 15), totalTasks: 15 };
+          }
+        });
+        setKpiInputs(newInputs);
+      }
+    } catch (err) {
+      console.warn("Gagal load evaluasi dari BE:", err.message);
+      setBeEvaluation(null);
+    } finally {
+      setIsLoadingEvaluation(false);
+    }
+  }, [targetEmpId, monthNumber, selectedYear]);
+
+  useEffect(() => {
+    loadKpiEvaluation();
+  }, [loadKpiEvaluation]);
 
   // Cegah pengetikan tanda minus, plus, atau exponential di input angka
   const handleKeyDownNonNegative = (e) => {
@@ -186,34 +278,34 @@ export default function KpiTracking() {
     }
   };
 
-  // Fungsi Handler Update Input Nilai KPI dengan proteksi nilai non-negatif
+  // Handler Update Input Nilai KPI
   const handleInputChange = (kpiNo, field, val) => {
-    if (val === "") {
-      setKpiInputs((prev) => ({
+    const cleanNum = val === "" ? "" : Math.max(0, Number(val));
+    setKpiInputs((prev) => {
+      const next = {
         ...prev,
         [kpiNo]: {
           ...prev[kpiNo],
-          [field]: "",
+          [field]: isNaN(cleanNum) ? 0 : cleanNum,
         },
-      }));
-      return;
-    }
-    const cleanNum = Math.max(0, Number(val));
-    setKpiInputs((prev) => ({
-      ...prev,
-      [kpiNo]: {
-        ...prev[kpiNo],
-        [field]: isNaN(cleanNum) ? 0 : cleanNum,
-      },
-    }));
+      };
+      if (targetEmpId) {
+        localStorage.setItem(`kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`, JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   // Reset Input ke Nilai Standar
   const handleResetInputs = () => {
     setKpiInputs(DEFAULT_INPUTS);
+    if (targetEmpId) {
+      localStorage.removeItem(`kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`);
+    }
     setExportNotification("Nilai input KPI berhasil di-reset ke nilai default!");
     setTimeout(() => setExportNotification(false), 3000);
   };
+
 
   // Kalkulasi Otomatis Seluruh Nilai KPI Berdasarkan Rumus
   const computedMetrics = KPI_METRICS_TEMPLATE.map((kpi) => {
@@ -306,8 +398,9 @@ export default function KpiTracking() {
   // Unduh File Excel (.xlsx) Multi-Sheet (1 Sheet per Karyawan)
   const handleDownloadExcel = () => {
     const wb = XLSX.utils.book_new();
+    const listToExport = employeesList.length > 0 ? employeesList : EMPLOYEES;
 
-    EMPLOYEES.forEach((emp) => {
+    listToExport.forEach((emp) => {
       // Baris Header Laporan Resmi PT. JAGA
       const sheetData = [
         ["LAPORAN EVALUASI KEY PERFORMANCE INDICATOR (KPI)"],
@@ -491,9 +584,9 @@ export default function KpiTracking() {
                 onChange={(e) => setSelectedEmp(e.target.value)}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
               >
-                {EMPLOYEES.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.role})
+                {(employeesList.length > 0 ? employeesList : EMPLOYEES).map((emp) => (
+                  <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                    {emp.name} ({emp.position || emp.role})
                   </option>
                 ))}
               </select>
@@ -1078,30 +1171,64 @@ export default function KpiTracking() {
                 </button>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setIsInputModalOpen(false)}
                     className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
+                    type="button"
                     onClick={async () => {
+                      setIsSaving(true);
+                      const scoresPayload = KPI_METRICS_TEMPLATE.map((template, idx) => {
+                        const computed = computedMetrics[idx];
+                        const targetVal = parseFloat(template.monthlyTarget) || 100;
+                        const actualVal = parseFloat(computed?.actual) || 0;
+                        const scoreVal = Number(((actualVal / (targetVal || 1)) * template.weight).toFixed(2));
+
+                        return {
+                          indicatorName: template.kpiName,
+                          category: template.category,
+                          target: targetVal,
+                          actual: actualVal,
+                          weight: template.weight,
+                          unit: template.levels.l4.includes("%") ? "%" : template.levels.l4.includes("SP") ? "SP" : "poin",
+                          score: scoreVal,
+                          note: `Capaian Level ${computed.achievedLevel} (${computed.actual})`,
+                        };
+                      });
+
                       try {
                         await kpiService.saveKpiEvaluations({
-                          empId: currentEmployee.id,
-                          month: activeTab,
-                          year: selectedYear,
+                          employeeId: targetEmpId,
+                          month: monthNumber,
+                          year: Number(selectedYear),
+                          scores: scoresPayload,
                           inputs: kpiInputs,
                         });
+
+                        if (targetEmpId) {
+                          localStorage.setItem(`kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`, JSON.stringify(kpiInputs));
+                        }
+
+                        setIsInputModalOpen(false);
+                        setExportNotification(`Data capaian KPI untuk ${currentEmployee.name} berhasil disimpan ke database Backend!`);
+                        setTimeout(() => setExportNotification(false), 4000);
+                        await loadKpiEvaluation();
                       } catch (err) {
                         console.error("Gagal simpan KPI:", err);
+                        setExportNotification(`Gagal menyimpan ke Backend: ${err.message || "Periksa koneksi"}`);
+                        setTimeout(() => setExportNotification(false), 5000);
+                      } finally {
+                        setIsSaving(false);
                       }
-                      setIsInputModalOpen(false);
-                      setExportNotification(`Data capaian KPI untuk ${currentEmployee.name} berhasil disimpan dan otomatis masuk ke tabel evaluasi!`);
-                      setTimeout(() => setExportNotification(false), 4000);
                     }}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+                    disabled={isSaving}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-60"
                   >
-                    <FaSave /> Simpan & Masukkan ke Tabel KPI
+                    {isSaving ? <FaSpinner className="animate-spin" /> : <FaSave />}
+                    {isSaving ? "Menyimpan ke BE..." : "Simpan & Masukkan ke Tabel KPI"}
                   </button>
                 </div>
               </div>
