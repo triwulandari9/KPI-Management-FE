@@ -5,29 +5,17 @@ export const authService = {
     const cleanEmail = (email || "").trim().toLowerCase();
     const cleanPassword = (password || "").trim();
 
-    try {
-      const response = await apiClient.post("/auth/login", {
-        email: cleanEmail,
-        password: cleanPassword,
-      });
+    const response = await apiClient.post("/auth/login", {
+      email: cleanEmail,
+      password: cleanPassword,
+    });
 
-      const token = response?.token || response?.data?.token || response?.accessToken;
-      if (token) {
-        localStorage.setItem("kpi_token", token);
-      }
-
-      let user = response.user || response.data?.user || response.data || response;
-      if (user && typeof user === "object") {
-        user = {
-          ...user,
-          role: user.role?.toLowerCase() === "hr" ? "HR" : user.role,
-        };
-      }
-
-      return user;
-    } catch (err) {
-      throw err;
+    const token = response?.token || response?.data?.token || response?.accessToken;
+    if (token) {
+      localStorage.setItem("kpi_token", token);
     }
+
+    return response?.user || response?.data?.user || response?.data || response;
   },
 
   async login(email, password) {
@@ -40,13 +28,14 @@ export const authService = {
     if (token) {
       localStorage.setItem("kpi_token", token);
     }
-    return response.data || response;
+    return response?.data || response;
   },
 
   async loginWithGoogle(credentialResponse) {
-    const tokenPayload = typeof credentialResponse === "string" 
-      ? credentialResponse 
-      : (credentialResponse?.credential || credentialResponse?.token);
+    const tokenPayload =
+      typeof credentialResponse === "string"
+        ? credentialResponse
+        : credentialResponse?.credential || credentialResponse?.token;
 
     const response = await apiClient.post("/auth/google", {
       token: tokenPayload,
@@ -58,23 +47,12 @@ export const authService = {
       localStorage.setItem("kpi_token", token);
     }
 
-    let user = response.user || response.data?.user || response.data || response;
-    if (user && typeof user === "object") {
-      user = {
-        ...user,
-        role: user.role?.toLowerCase() === "hr" ? "HR" : user.role,
-      };
-    }
-    return user;
+    return response?.user || response?.data?.user || response?.data || response;
   },
 
   async getCurrentUser() {
-    try {
-      const response = await apiClient.get("/auth/me");
-      return response.user || response.data?.user || response.data || response;
-    } catch {
-      return null;
-    }
+    const response = await apiClient.get("/auth/me");
+    return response?.user || response?.data?.user || response?.data || response;
   },
 
   async getMe() {
@@ -89,3 +67,4 @@ export const authService = {
 };
 
 export default authService;
+
