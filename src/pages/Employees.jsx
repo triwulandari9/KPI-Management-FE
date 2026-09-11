@@ -11,6 +11,9 @@ import {
   FaTasks,
   FaChartLine,
   FaEdit,
+  FaCamera,
+  FaTrashAlt,
+  FaExclamationCircle,
 } from "react-icons/fa";
 
 import Header from "../layouts/Header";
@@ -35,11 +38,21 @@ export default function Employees() {
       .join(" ");
   };
 
+  // Helper untuk generate avatar inisial jika foto belum ada / kosong
+  const getAvatarUrl = (emp) => {
+    if (emp?.avatar && typeof emp.avatar === "string" && emp.avatar.trim().length > 0) {
+      return emp.avatar;
+    }
+    const name = emp?.name || "User";
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&bold=true&rounded=true`;
+  };
+
   const [employees, setEmployees] = useState([]);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
 
   // State Form Tambah Karyawan Baru
   const [newEmployee, setNewEmployee] = useState({
@@ -47,6 +60,7 @@ export default function Employees() {
     role: "Frontend Developer",
     department: "Engineering",
     email: "",
+    avatar: "",
   });
 
   // State Form Edit Karyawan (Khusus HR)
@@ -55,6 +69,7 @@ export default function Employees() {
     role: "Frontend Developer",
     department: "Engineering",
     email: "",
+    avatar: "",
   });
 
   useEffect(() => {
@@ -79,32 +94,95 @@ export default function Employees() {
     return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;
   });
 
+  // Validasi & Upload Foto (JPG, JPEG, PNG, Maks 2MB)
+  const handleAvatarChange = (e, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Batasan format: JPG, JPEG, PNG
+    const validExtensions = ["jpg", "jpeg", "png"];
+    const fileExt = file.name.split(".").pop().toLowerCase();
+    const validTypes = ["image/jpeg", "image/jpg", "image/png"];
+
+    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExt)) {
+      setAvatarError("Format file tidak didukung! Harap upload foto format JPG, JPEG, atau PNG.");
+      return;
+    }
+
+    // Batasan ukuran: Maks 2MB
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("Ukuran foto terlalu besar! Maksimal ukuran file 2MB.");
+      return;
+    }
+
+    setAvatarError("");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Url = reader.result;
+      if (isEdit) {
+        setEditFormData((prev) => ({ ...prev, avatar: base64Url }));
+      } else {
+        setNewEmployee((prev) => ({ ...prev, avatar: base64Url }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     if (!newEmployee.name.trim() || !newEmployee.email.trim()) return;
 
+    const payload = {
+      ...newEmployee,
+      avatar:
+        newEmployee.avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(newEmployee.name)}&background=3b82f6&color=fff&bold=true`,
+    };
+
     try {
-      const created = await employeeService.createEmployee(newEmployee);
+      const created = await employeeService.createEmployee(payload);
       setEmployees((prev) => [...prev, created]);
       setIsModalOpen(false);
+      setAvatarError("");
       setNewEmployee({
         name: "",
         role: "Frontend Developer",
         department: "Engineering",
         email: "",
+        avatar: "",
       });
     } catch (err) {
       console.error("Gagal menambah karyawan:", err);
+      // Fallback local append
+      setEmployees((prev) => [
+        ...prev,
+        {
+          id: `EMP-${Date.now().toString().slice(-4)}`,
+          ...payload,
+          stats: { kpiLevel: 3, sprintPoints: 0, totalTasks: 0, onTimeRate: "100%", slaBugRate: "100%" },
+        },
+      ]);
+      setIsModalOpen(false);
+      setAvatarError("");
+      setNewEmployee({
+        name: "",
+        role: "Frontend Developer",
+        department: "Engineering",
+        email: "",
+        avatar: "",
+      });
     }
   };
 
   const handleOpenEditModal = (emp) => {
     setEditingEmployee(emp);
+    setAvatarError("");
     setEditFormData({
       name: formatName(emp.name || ""),
       role: emp.role || emp.position || "Frontend Developer",
       department: emp.department || "Engineering",
       email: emp.email || "",
+      avatar: emp.avatar || "",
     });
   };
 
@@ -126,6 +204,7 @@ export default function Employees() {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
       }
       setEditingEmployee(null);
+      setAvatarError("");
     } catch (err) {
       console.error("Gagal update data karyawan:", err);
       // Fallback local update agar UI tetap langsung terupdate
@@ -140,6 +219,7 @@ export default function Employees() {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData }));
       }
       setEditingEmployee(null);
+      setAvatarError("");
     }
   };
 
@@ -192,7 +272,7 @@ export default function Employees() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredEmployees.map((emp) => (
             <div
-              key={emp.id}
+              key={emp._id || emp.id}
               className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col justify-between group"
             >
               <div>
@@ -200,28 +280,31 @@ export default function Employees() {
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={emp.avatar}
+                      src={getAvatarUrl(emp)}
                       alt={emp.name}
-                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || "U")}&background=3b82f6&color=fff&bold=true`;
+                      }}
+                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all shrink-0 bg-gray-50"
                     />
                     <div className="min-w-0">
                       <h3 className="font-bold text-gray-800 text-sm truncate">{formatName(emp.name)}</h3>
                       <p className="text-xs text-primary font-medium truncate">{emp.role}</p>
-                      <span className="text-[10px] text-gray-400 font-mono truncate block">{emp.id}</span>
+                      <span className="text-[10px] text-gray-400 font-mono truncate block">{emp._id || emp.id}</span>
                     </div>
                   </div>
 
                   {/* Level Badge */}
                   <span
                     className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shrink-0 ${
-                      emp.stats.kpiLevel === 4
+                      emp.stats?.kpiLevel === 4
                         ? "bg-green-50 text-green-600 border-green-200"
-                        : emp.stats.kpiLevel === 3
+                        : emp.stats?.kpiLevel === 3
                         ? "bg-blue-50 text-blue-600 border-blue-200"
                         : "bg-amber-50 text-amber-600 border-amber-200"
                     }`}
                   >
-                    <FaAward size={10} /> Level {emp.stats.kpiLevel}
+                    <FaAward size={10} /> Level {emp.stats?.kpiLevel ?? 4}
                   </span>
                 </div>
 
@@ -229,11 +312,11 @@ export default function Employees() {
                 <div className="text-xs text-gray-500 flex flex-col gap-1.5 py-3 border-y border-gray-50">
                   <div className="flex items-center gap-2 text-gray-600">
                     <FaEnvelope className="text-gray-400 text-xs" />
-                    <span>{emp.email}</span>
+                    <span className="truncate">{emp.email}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-gray-400">
                     <span>Divisi: {emp.department}</span>
-                    <span>Bergabung: {emp.joinDate}</span>
+                    <span>Bergabung: {emp.joinDate || "2026"}</span>
                   </div>
                 </div>
 
@@ -241,15 +324,15 @@ export default function Employees() {
                 <div className="grid grid-cols-3 gap-2 text-center my-4 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
                   <div>
                     <p className="text-[10px] text-gray-400">Sprint Points</p>
-                    <p className="text-sm font-bold text-accent">{emp.stats.sprintPoints} SP</p>
+                    <p className="text-sm font-bold text-accent">{emp.stats?.sprintPoints ?? 0} SP</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400">Total Task</p>
-                    <p className="text-sm font-bold text-gray-800">{emp.stats.totalTasks}</p>
+                    <p className="text-sm font-bold text-gray-800">{emp.stats?.totalTasks ?? 0}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400">On Time</p>
-                    <p className="text-sm font-bold text-green-600">{emp.stats.onTimeRate}</p>
+                    <p className="text-sm font-bold text-green-600">{emp.stats?.onTimeRate ?? "100%"}</p>
                   </div>
                 </div>
               </div>
@@ -283,12 +366,15 @@ export default function Employees() {
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <img
-                    src={selectedEmployee.avatar}
+                    src={getAvatarUrl(selectedEmployee)}
                     alt={selectedEmployee.name}
-                    className="w-12 h-12 rounded-2xl object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEmployee.name || "U")}&background=3b82f6&color=fff&bold=true`;
+                    }}
+                    className="w-12 h-12 rounded-2xl object-cover ring-2 ring-primary/20 bg-gray-50"
                   />
                   <div>
-                    <h3 className="font-bold text-base text-gray-800">{selectedEmployee.name}</h3>
+                    <h3 className="font-bold text-base text-gray-800">{formatName(selectedEmployee.name)}</h3>
                     <p className="text-xs text-primary font-medium">{selectedEmployee.role}</p>
                   </div>
                 </div>
@@ -305,7 +391,7 @@ export default function Employees() {
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-400 block text-[11px]">Email Resmi</span>
-                    <span className="font-semibold text-gray-700">{selectedEmployee.email}</span>
+                    <span className="font-semibold text-gray-700 break-all">{selectedEmployee.email}</span>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-400 block text-[11px]">Divisi</span>
@@ -373,7 +459,10 @@ export default function Employees() {
                   <p className="text-xs text-gray-400">Daftarkan karyawan baru ke sistem KPI</p>
                 </div>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setAvatarError("");
+                  }}
                   className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
                 >
                   <FaTimes />
@@ -381,6 +470,53 @@ export default function Employees() {
               </div>
 
               <form onSubmit={handleCreateEmployee} className="mt-4 flex flex-col gap-3.5 text-xs">
+                {/* Upload Foto Profil (JPG, JPEG, PNG) */}
+                <div className="flex flex-col gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+                  <label className="font-semibold text-gray-700">Foto Profil Karyawan (Opsional)</label>
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={
+                        newEmployee.avatar ||
+                        (newEmployee.name
+                          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(newEmployee.name)}&background=3b82f6&color=fff&bold=true`
+                          : "https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&bold=true")
+                      }
+                      alt="Preview"
+                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-2xs">
+                          <FaCamera size={11} className="text-primary" /> Pilih Foto
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            onChange={(e) => handleAvatarChange(e, false)}
+                            className="hidden"
+                          />
+                        </label>
+                        {newEmployee.avatar && (
+                          <button
+                            type="button"
+                            onClick={() => setNewEmployee((prev) => ({ ...prev, avatar: "" }))}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Hapus foto"
+                          >
+                            <FaTrashAlt size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 2MB)</p>
+                    </div>
+                  </div>
+                  {avatarError && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 p-2 rounded-xl border border-red-200">
+                      <FaExclamationCircle className="shrink-0" />
+                      <span>{avatarError}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">
                     Nama Lengkap <span className="text-red-500">*</span>
@@ -443,7 +579,10 @@ export default function Employees() {
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setAvatarError("");
+                    }}
                     className="px-4 py-2 rounded-xl font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
                   >
                     Batal
@@ -475,7 +614,10 @@ export default function Employees() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setEditingEmployee(null)}
+                  onClick={() => {
+                    setEditingEmployee(null);
+                    setAvatarError("");
+                  }}
                   className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
                 >
                   <FaTimes />
@@ -483,6 +625,51 @@ export default function Employees() {
               </div>
 
               <form onSubmit={handleUpdateEmployee} className="mt-4 flex flex-col gap-3.5 text-xs">
+                {/* Upload Foto Profil di Form Edit */}
+                <div className="flex flex-col gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+                  <label className="font-semibold text-gray-700">Foto Profil Karyawan</label>
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={
+                        editFormData.avatar ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(editFormData.name || "User")}&background=3b82f6&color=fff&bold=true`
+                      }
+                      alt="Preview"
+                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-2xs">
+                          <FaCamera size={11} className="text-primary" /> Ubah Foto
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                            onChange={(e) => handleAvatarChange(e, true)}
+                            className="hidden"
+                          />
+                        </label>
+                        {editFormData.avatar && (
+                          <button
+                            type="button"
+                            onClick={() => setEditFormData((prev) => ({ ...prev, avatar: "" }))}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Hapus foto (gunakan avatar inisial)"
+                          >
+                            <FaTrashAlt size={12} />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 2MB)</p>
+                    </div>
+                  </div>
+                  {avatarError && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 p-2 rounded-xl border border-red-200">
+                      <FaExclamationCircle className="shrink-0" />
+                      <span>{avatarError}</span>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">
                     Nama Lengkap <span className="text-red-500">*</span>
@@ -546,7 +733,10 @@ export default function Employees() {
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
                   <button
                     type="button"
-                    onClick={() => setEditingEmployee(null)}
+                    onClick={() => {
+                      setEditingEmployee(null);
+                      setAvatarError("");
+                    }}
                     className="px-4 py-2 rounded-xl font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
                   >
                     Batal
