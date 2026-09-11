@@ -184,22 +184,35 @@ export default function KpiTracking() {
   const [kpiInputs, setKpiInputs] = useState(DEFAULT_INPUTS);
 
   // Load Real Employees from Backend
-  useEffect(() => {
-    async function loadEmployees() {
-      try {
-        const data = await employeeService.getEmployees();
-        if (Array.isArray(data) && data.length > 0) {
-          setEmployeesList(data);
-          if (isHR) {
-            setSelectedEmp((prev) => prev || data[0]._id || data[0].id);
-          }
+  const fetchEmployees = async () => {
+    try {
+      const data = await employeeService.getEmployees();
+      if (Array.isArray(data) && data.length > 0) {
+        setEmployeesList(data);
+        if (isHR) {
+          setSelectedEmp((prev) => prev || data[0]._id || data[0].id);
         }
-      } catch (err) {
-        console.error("Gagal load employees:", err);
       }
+    } catch (err) {
+      console.error("Gagal load employees:", err);
     }
-    loadEmployees();
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchEmployees();
   }, [isHR]);
+
+  // Listen for avatar updates to refresh employee data
+  useEffect(() => {
+    const handler = () => {
+      fetchEmployees();
+    };
+    window.addEventListener("user_avatar_updated", handler);
+    return () => {
+      window.removeEventListener("user_avatar_updated", handler);
+    };
+  }, []);
 
   const currentEmployee = isHR
     ? employeesList.find((e) => (e._id || e.id) === selectedEmp) || employeesList[0] || {
@@ -398,7 +411,7 @@ export default function KpiTracking() {
   // Unduh File Excel (.xlsx) Multi-Sheet (1 Sheet per Karyawan)
   const handleDownloadExcel = () => {
     const wb = XLSX.utils.book_new();
-    const listToExport = employeesList.length > 0 ? employeesList : EMPLOYEES;
+    const listToExport = employeesList;
 
     listToExport.forEach((emp) => {
       // Baris Header Laporan Resmi PT. JAGA
@@ -584,7 +597,7 @@ export default function KpiTracking() {
                 onChange={(e) => setSelectedEmp(e.target.value)}
                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs w-full"
               >
-                {(employeesList.length > 0 ? employeesList : EMPLOYEES).map((emp) => (
+                {employeesList.map((emp) => (
                   <option key={emp._id || emp.id} value={emp._id || emp.id}>
                     {emp.name} ({emp.position || emp.role})
                   </option>
