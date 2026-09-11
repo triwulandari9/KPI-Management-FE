@@ -516,17 +516,17 @@ export default function KpiTracking() {
       <Header />
       <Sidebar />
 
-      <main className={`${collapsed ? "ml-20" : "ml-64"} pt-16 p-8 transition-all duration-300`}>
+      <main className={`transition-all duration-300 pt-16 p-4 sm:p-6 lg:p-8 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader
           title="KPI Tracking & Performance Evaluation"
           subtitle={`Tabel evaluasi capaian Key Performance Indicator tahun ${selectedYear} • PT. JAGA`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Tombol Buka Form Input Capaian KPI (Untuk Karyawan & HR) */}
             <button
               onClick={() => setIsInputModalOpen(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
             >
               <FaEdit /> Input Capaian KPI
             </button>
@@ -535,10 +535,10 @@ export default function KpiTracking() {
             {isHR && (
               <button
                 onClick={handleDownloadExcel}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
                 title="Unduh 1 file Excel berisi semua sheet data KPI karyawan"
               >
-                <FaFileExcel /> Export Excel (Semua Karyawan)
+                <FaFileExcel /> Export Excel
               </button>
             )}
           </div>
@@ -558,31 +558,31 @@ export default function KpiTracking() {
         )}
 
         {/* Info Top Banner & Karyawan Selector */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary-light text-primary flex items-center justify-center font-bold text-lg">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-primary-light text-primary flex items-center justify-center font-bold text-lg shrink-0">
               <FaChartBar />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-gray-800 text-base">Evaluasi Kinerja: {currentEmployee.name}</h3>
-                <span className="text-xs bg-primary-light text-primary px-2.5 py-0.5 rounded-full font-semibold">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-gray-800 text-sm sm:text-base">{currentEmployee.name}</h3>
+                <span className="text-[10px] sm:text-xs bg-primary-light text-primary px-2.5 py-0.5 rounded-full font-semibold">
                   {currentEmployee.role}
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">Tahun: <b>{selectedYear}</b> • PT: <b>PT. JAGA</b> • Periode: <b>{activeTab}</b></p>
+              <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Tahun: <b>{selectedYear}</b> • PT: <b>PT. JAGA</b> • Periode: <b>{activeTab}</b></p>
             </div>
           </div>
 
           {/* Switcher Karyawan (Khusus HR bisa pilih karyawan) */}
           {isHR && (
             <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200">
-              <FaUserTie className="text-gray-400 text-sm ml-1" />
-              <span className="text-xs font-semibold text-gray-600">Pilih Karyawan (Mode HR):</span>
+              <FaUserTie className="text-gray-400 text-sm ml-1 shrink-0" />
+              <span className="text-xs font-semibold text-gray-600 shrink-0">Pilih Karyawan:</span>
               <select
                 value={selectedEmp}
                 onChange={(e) => setSelectedEmp(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
+                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs w-full"
               >
                 {(employeesList.length > 0 ? employeesList : EMPLOYEES).map((emp) => (
                   <option key={emp._id || emp.id} value={emp._id || emp.id}>
@@ -595,52 +595,52 @@ export default function KpiTracking() {
         </div>
 
         {/* Quick KPI Overview Cards (Terhitung Real-time dari Rumus) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-base">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-base shrink-0">
               <FaTrophy />
             </div>
-            <div>
-              <p className="text-[11px] text-gray-400">Rata-rata Capaian</p>
-              <p className="text-lg font-extrabold text-gray-800">Level {avgLevel}</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Rata-rata Capaian</p>
+              <p className="text-base sm:text-lg font-extrabold text-gray-800">Level {avgLevel}</p>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center text-base">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center text-base shrink-0">
               <FaBolt />
             </div>
-            <div>
-              <p className="text-[11px] text-gray-400">Total Bobot Metrik</p>
-              <p className="text-lg font-extrabold text-gray-800">{totalWeight}% (Lengkap)</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Total Bobot Metrik</p>
+              <p className="text-base sm:text-lg font-extrabold text-gray-800">{totalWeight}% (Lengkap)</p>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base shrink-0">
               <FaBullseye />
             </div>
-            <div>
-              <p className="text-[11px] text-gray-400">Target Level 4 Tercapai</p>
-              <p className="text-lg font-extrabold text-green-600">{totalLevel4} dari {computedMetrics.length} Metrik</p>
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Target Level 4</p>
+              <p className="text-base sm:text-lg font-extrabold text-green-600 truncate">{totalLevel4} dari {computedMetrics.length} Metrik</p>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base shrink-0">
               <FaChartLine />
             </div>
-            <div>
-              <p className="text-[11px] text-gray-400">Sprint Point Terkumpul</p>
-              <p className="text-lg font-extrabold text-accent">
-                {kpiInputs[8]?.spEarned ?? 98} SP / {kpiInputs[8]?.spTarget ?? 88} SP
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Sprint Point</p>
+              <p className="text-base sm:text-lg font-extrabold text-accent truncate">
+                {kpiInputs[8]?.spEarned ?? 98} / {kpiInputs[8]?.spTarget ?? 88} SP
               </p>
             </div>
           </div>
         </div>
 
-        {/* TAB BULAN & PILIHAN TAHUN DI SEBELAH KANAN */}
-        <div className="bg-white rounded-3xl p-3 shadow-sm border border-gray-100 mb-6 flex flex-wrap items-center justify-between gap-4">
+        {/* TAB BULAN & PILIHAN TAHUN */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
           {/* 10+ Tab Bulan (Januari - Desember) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full">
             {MONTH_TABS.map((tab) => (
@@ -706,9 +706,15 @@ export default function KpiTracking() {
         </div>
 
         {/* TABEL UTAMA EVALUASI KPI */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-200/80 overflow-hidden">
+        <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
+          <span className="font-semibold text-gray-700">Tabel Evaluasi Capaian Bulanan</span>
+          <span className="lg:hidden text-primary text-[11px] font-medium flex items-center gap-1">
+            ⇄ Geser ke samping
+          </span>
+        </div>
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200/80 overflow-hidden mb-8">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse min-w-[960px]">
               <thead>
                 {/* Baris 1 Header Excel */}
                 <tr className="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold">
@@ -854,10 +860,10 @@ export default function KpiTracking() {
         </div>
         {/* MODAL: Form Input Capaian KPI Karyawan */}
         {isInputModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-3xl w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
               {/* Header Modal */}
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center text-lg shadow-sm">
                     <FaEdit />
@@ -1162,18 +1168,18 @@ export default function KpiTracking() {
               </div>
 
               {/* Footer Modal: Actions */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-gray-100">
                 <button
                   onClick={handleResetInputs}
                   className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer"
                 >
                   Reset ke Standar
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     type="button"
                     onClick={() => setIsInputModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                    className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer text-center"
                   >
                     Batal
                   </button>

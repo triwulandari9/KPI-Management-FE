@@ -83,13 +83,13 @@ export default function Employees() {
       <Header />
       <Sidebar />
 
-      <main className={`${collapsed ? "ml-20" : "ml-64"} pt-16 p-8 transition-all duration-300`}>
+      <main className={`transition-all duration-300 pt-16 p-4 sm:p-6 lg:p-8 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader title="Employee Directory" subtitle="Daftar profil pengembang dan ringkasan capaian performa KPI">
           {isHR && (
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer w-full sm:w-auto justify-center"
             >
               <FaUserPlus size={13} /> Tambah Karyawan
             </button>
@@ -97,15 +97,15 @@ export default function Employees() {
         </PageHeader>
 
         {/* Filter Toolbar */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">Filter Divisi / Role:</span>
-            <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 transition-colors">
-              <FaFilter className="text-gray-400" />
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 justify-between sm:justify-start">
+            <span className="text-xs font-semibold text-gray-500 shrink-0">Filter Divisi / Role:</span>
+            <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 transition-colors flex-1 sm:flex-initial">
+              <FaFilter className="text-gray-400 shrink-0" />
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="bg-transparent focus:outline-none font-medium cursor-pointer"
+                className="bg-transparent focus:outline-none font-medium cursor-pointer w-full"
               >
                 <option value="All">Semua Divisi & Role</option>
                 <option value="Engineering">Engineering (Dev)</option>
@@ -118,13 +118,13 @@ export default function Employees() {
             </div>
           </div>
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 text-right sm:text-left">
             Menampilkan <b>{filteredEmployees.length}</b> anggota tim
           </p>
         </div>
 
         {/* Employee Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredEmployees.map((emp) => (
             <div
               key={emp.id}
@@ -278,7 +278,7 @@ export default function Employees() {
         {/* MODAL 2: Tambah Karyawan Baru */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800">Tambah Anggota Tim</h3>

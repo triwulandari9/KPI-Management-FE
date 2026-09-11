@@ -120,15 +120,15 @@ export default function CalendarPage() {
   });
 
   return (
-    <div className="bg-gray-50 h-screen overflow-hidden flex flex-col">
+    <div className="bg-gray-50 min-h-screen lg:h-screen lg:overflow-hidden flex flex-col">
       <Header />
       <Sidebar />
 
-      <main className={`${collapsed ? "ml-20" : "ml-64"} pt-16 px-8 pb-4 flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
+      <main className={`pt-16 p-4 sm:p-6 lg:px-8 lg:pb-4 flex-1 flex flex-col overflow-auto lg:overflow-hidden transition-all duration-300 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Header Kalender Sesuai Desain */}
-        <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
               {MONTH_NAMES[currentMonth]} {currentYear}
             </h1>
             <p className="text-gray-400 text-xs font-normal">
@@ -137,7 +137,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Controls: View Mode, Filter Status, Filter Team, Navigasi Bulan */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {/* View Switch: List | Month | Week */}
             <div className="bg-gray-100/90 p-1 rounded-xl flex items-center">
               {["List", "Month", "Week"].map((mode) => (
@@ -216,23 +216,24 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* View Mode: MONTH (Google Calendar Style Grid - Pas 1 Layar Penuh) */}
+        {/* View Mode: MONTH (Google Calendar Style Grid) */}
         {viewType === "Month" && (
-          <div className="flex-1 flex flex-col bg-white rounded-3xl border border-gray-200/80 shadow-sm overflow-hidden min-h-0">
-            {/* Header Hari: SUN, MON, TUE, WED, THU, FRI, SAT */}
-            <div className="shrink-0 grid grid-cols-7 border-b border-gray-200 bg-gray-50/50 text-center text-[10px] font-bold text-gray-500 py-2 tracking-wider">
-              {DAYS_OF_WEEK.map((day) => (
-                <div key={day}>{day}</div>
-              ))}
-            </div>
+          <div className="flex-1 flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-sm overflow-x-auto min-h-[500px] lg:min-h-0">
+            <div className="min-w-[650px] flex-1 flex flex-col h-full">
+              {/* Header Hari: SUN, MON, TUE, WED, THU, FRI, SAT */}
+              <div className="shrink-0 grid grid-cols-7 border-b border-gray-200 bg-gray-50/50 text-center text-[10px] font-bold text-gray-500 py-2 tracking-wider">
+                {DAYS_OF_WEEK.map((day) => (
+                  <div key={day}>{day}</div>
+                ))}
+              </div>
 
-            {/* Grid Sel Kalender (Mengisi 100% sisa tinggi layar tanpa scroll) */}
-            <div
-              className="flex-1 grid grid-cols-7 divide-x divide-y divide-gray-100 min-h-0"
-              style={{
-                gridTemplateRows: `repeat(${Math.ceil(calendarCells.length / 7)}, minmax(0, 1fr))`,
-              }}
-            >
+              {/* Grid Sel Kalender */}
+              <div
+                className="flex-1 grid grid-cols-7 divide-x divide-y divide-gray-100 min-h-0"
+                style={{
+                  gridTemplateRows: `repeat(${Math.ceil(calendarCells.length / 7)}, minmax(0, 1fr))`,
+                }}
+              >
               {calendarCells.map((cell, idx) => {
                 const isSelectedToday =
                   cell.isCurrentMonth &&
@@ -295,6 +296,7 @@ export default function CalendarPage() {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         )}
@@ -302,42 +304,44 @@ export default function CalendarPage() {
         {/* View Mode: LIST VIEW */}
         {viewType === "List" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
-                <tr>
-                  <th className="p-4">Tanggal</th>
-                  <th className="p-4">Nama Agenda / Deadline</th>
-                  <th className="p-4">Tim & Assignee</th>
-                  <th className="p-4">Kategori</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {filteredEvents.map((evt) => (
-                  <tr
-                    key={evt.id}
-                    onClick={() => setSelectedEvent(evt)}
-                    className="hover:bg-gray-50/70 transition-colors cursor-pointer"
-                  >
-                    <td className="p-4 font-bold text-gray-800">
-                      {evt.day} {MONTH_NAMES[evt.month]} {evt.year}
-                    </td>
-                    <td className="p-4 font-semibold text-gray-900">{evt.title}</td>
-                    <td className="p-4 text-gray-600 flex items-center gap-1.5">
-                      <FaUserCircle className="text-primary" /> {evt.assignee} ({evt.team})
-                    </td>
-                    <td className="p-4">
-                      <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-medium">
-                        {evt.category}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-semibold text-primary">{evt.status}</span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[640px]">
+                <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
+                  <tr>
+                    <th className="p-4">Tanggal</th>
+                    <th className="p-4">Nama Agenda / Deadline</th>
+                    <th className="p-4">Tim & Assignee</th>
+                    <th className="p-4">Kategori</th>
+                    <th className="p-4">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {filteredEvents.map((evt) => (
+                    <tr
+                      key={evt.id}
+                      onClick={() => setSelectedEvent(evt)}
+                      className="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                    >
+                      <td className="p-4 font-bold text-gray-800">
+                        {evt.day} {MONTH_NAMES[evt.month]} {evt.year}
+                      </td>
+                      <td className="p-4 font-semibold text-gray-900">{evt.title}</td>
+                      <td className="p-4 text-gray-600 flex items-center gap-1.5">
+                        <FaUserCircle className="text-primary" /> {evt.assignee} ({evt.team})
+                      </td>
+                      <td className="p-4">
+                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-medium">
+                          {evt.category}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className="font-semibold text-primary">{evt.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -360,10 +364,10 @@ export default function CalendarPage() {
           });
 
           return (
-            <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 text-center text-gray-500 text-xs">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 shadow-sm p-4 sm:p-6 text-center text-gray-500 text-xs overflow-x-auto">
               <p className="font-semibold text-sm text-gray-800 mb-1">Tampilan Mingguan (Week View)</p>
               <p className="text-gray-400">Menampilkan jadwal sprint untuk minggu berjalan.</p>
-              <div className="grid grid-cols-7 gap-3 mt-6">
+              <div className="grid grid-cols-7 gap-3 mt-6 min-w-[650px]">
                 {weekDays.map((wd) => {
                   const dayEvents = filteredEvents.filter(
                     (e) => e.day === wd.dayNumber && e.month === wd.month && e.year === wd.year

@@ -198,28 +198,28 @@ export default function Tasks() {
       <Header />
       <Sidebar />
 
-      <main className={`${collapsed ? "ml-20" : "ml-64"} pt-16 p-8 transition-all duration-300`}>
+      <main className={`transition-all duration-300 pt-16 p-4 sm:p-6 lg:p-8 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian tim pengembang">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer w-full sm:w-auto justify-center"
           >
             <FaPlus size={12} /> Tambah Task Baru
           </button>
         </PageHeader>
 
         {/* Toolbar & Filter Bar */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
           {/* Filter Category */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">Filter Kategori:</span>
-            <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 transition-colors">
-              <FaFilter className="text-gray-400" />
+          <div className="flex items-center gap-2 justify-between sm:justify-start">
+            <span className="text-xs font-semibold text-gray-500 shrink-0">Filter Kategori:</span>
+            <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 transition-colors flex-1 sm:flex-initial">
+              <FaFilter className="text-gray-400 shrink-0" />
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-transparent focus:outline-none font-medium cursor-pointer"
+                className="bg-transparent focus:outline-none font-medium cursor-pointer w-full"
               >
                 <option value="All">Semua Kategori</option>
                 <option value="Feature">Feature (Fitur)</option>
@@ -234,7 +234,7 @@ export default function Tasks() {
           <div className="flex items-center bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode("kanban")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === "kanban" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -242,7 +242,7 @@ export default function Tasks() {
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === "list" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -253,243 +253,234 @@ export default function Tasks() {
 
         {/* View Mode: KANBAN BOARD */}
         {viewMode === "kanban" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 items-start overflow-x-auto pb-6">
-            {STATUSES.map((col) => {
-              const colTasks = filteredTasks.filter((t) => t.status === col.id);
-              const isOver = dragOverColumn === col.id;
+          <div className="overflow-x-auto pb-6 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="flex xl:grid xl:grid-cols-6 gap-3.5 items-start">
+              {STATUSES.map((col) => {
+                const colTasks = filteredTasks.filter((t) => t.status === col.id);
+                const isOver = dragOverColumn === col.id;
 
-              return (
-                <div
-                  key={col.id}
-                  onDragOver={handleDragOver}
-                  onDragEnter={() => handleDragEnter(col.id)}
-                  onDragLeave={() => handleDragLeave(col.id)}
-                  onDrop={(e) => handleDrop(e, col.id)}
-                  className={`rounded-2xl p-3 border transition-all duration-200 flex flex-col min-h-[520px] ${
-                    isOver
-                      ? "bg-primary-light/50 border-primary border-2 border-dashed shadow-md"
-                      : "bg-gray-100/70 border-gray-200/70"
-                  }`}
-                >
-                  {/* Column Header */}
-                  <div className="flex items-center justify-between pb-2.5 border-b border-gray-200 mb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`}></span>
-                      <h3 className="text-xs font-bold text-gray-800">{col.label}</h3>
-                    </div>
-                    <span className="text-[11px] font-semibold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs">
-                      {colTasks.length}
-                    </span>
-                  </div>
-
-                  {/* Task Cards in Column */}
-                  <div className="flex flex-col gap-2.5 flex-1">
-                    {colTasks.length === 0 ? (
-                      <div className={`border-2 border-dashed rounded-xl p-4 text-center text-xs transition-colors my-auto ${
-                        isOver ? "border-primary text-primary font-semibold" : "border-gray-200 text-gray-400"
-                      }`}>
-                        {isOver ? "Lepaskan task di sini" : "Tarik task ke sini"}
+                return (
+                  <div
+                    key={col.id}
+                    onDragOver={handleDragOver}
+                    onDragEnter={() => handleDragEnter(col.id)}
+                    onDragLeave={() => handleDragLeave(col.id)}
+                    onDrop={(e) => handleDrop(e, col.id)}
+                    className={`rounded-2xl p-3 border transition-all duration-200 flex flex-col min-h-[420px] sm:min-h-[520px] w-[280px] sm:w-[320px] xl:w-auto shrink-0 xl:shrink ${
+                      isOver
+                        ? "bg-primary-light/50 border-primary border-2 border-dashed shadow-md"
+                        : "bg-gray-100/70 border-gray-200/70"
+                    }`}
+                  >
+                    {/* Column Header */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-200 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`}></span>
+                        <h3 className="text-xs font-bold text-gray-800">{col.label}</h3>
                       </div>
-                    ) : (
-                      colTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, task.id)}
-                          onDragEnd={() => setDraggedTaskId(null)}
-                          className={`bg-white rounded-xl p-3 shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none ${
-                            draggedTaskId === task.id ? "opacity-40 scale-95 border-dashed border-primary" : ""
-                          }`}
-                        >
-                          {/* Top: Category & Point */}
-                          <div className="flex items-center justify-between gap-1">
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
-                                CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-600"
-                              }`}
-                            >
-                              {CATEGORY_BADGES[task.category]?.icon}
-                              {task.category}
-                            </span>
+                      <span className="text-[11px] font-semibold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs">
+                        {colTasks.length}
+                      </span>
+                    </div>
 
-                            {/* Point Indicator (Diisi oleh PO / HR) */}
-                            {task.point !== null ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isHR) {
-                                    setSelectedTaskForPoint(task);
-                                    setInputPoint(task.point);
-                                  }
-                                }}
-                                className={`text-[10px] font-bold text-accent bg-accent-light px-2 py-0.5 rounded-full border border-accent/20 flex items-center gap-1 ${
-                                  isHR ? "hover:bg-accent hover:text-white cursor-pointer" : ""
+                    {/* Task Cards Container */}
+                    <div className="flex flex-col gap-2.5 flex-1">
+                      {colTasks.length === 0 ? (
+                        <div className="h-28 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs text-center p-3">
+                          {isOver ? "Lepaskan task di sini" : "Tidak ada task"}
+                        </div>
+                      ) : (
+                        colTasks.map((task) => (
+                          <div
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, task.id)}
+                            className="bg-white rounded-xl p-3.5 border border-gray-200/80 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2 group relative"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-gray-400 font-mono">{task.id}</span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                  CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                                 }`}
-                                title={isHR ? "Klik untuk ubah poin SP (Mode HR)" : "Story Points"}
                               >
-                                <span>{task.point} SP</span>
-                                {isHR && <FaEdit size={9} />}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (isHR) {
-                                    setSelectedTaskForPoint(task);
-                                    setInputPoint(5);
-                                  }
-                                }}
-                                className={`text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1 ${
-                                  isHR ? "hover:bg-primary-light hover:text-primary hover:border-primary cursor-pointer font-semibold text-primary" : ""
-                                }`}
-                                title={isHR ? "Klik untuk beri poin SP ke task ini" : "Poin akan dinilai oleh Product Owner/HR"}
-                              >
-                                <span>{isHR ? "+ Beri Poin" : "Menunggu PO"}</span>
-                              </button>
-                            )}
-                          </div>
+                                {task.category}
+                              </span>
+                            </div>
 
-                          {/* Title & Description */}
-                          <div>
-                            <span className="text-[10px] text-gray-400 font-mono block">{task.id}</span>
-                            <h4 className="text-xs font-bold text-gray-800 leading-snug line-clamp-2 mt-0.5">
+                            <h4 className="text-xs font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug">
                               {task.title}
                             </h4>
+
                             {task.description && (
-                              <p className="text-[11px] text-gray-500 line-clamp-2 mt-1">{task.description}</p>
+                              <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed">
+                                {task.description}
+                              </p>
+                            )}
+
+                            {/* Info Deadline & SP Point */}
+                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                              <span className="flex items-center gap-1 text-[10px]">
+                                <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline}
+                              </span>
+
+                              {/* Badge Poin (Bisa diklik khusus HR/PO untuk atur nilai poin) */}
+                              {isHR ? (
+                                <button
+                                  onClick={() => handleOpenPointModal(task)}
+                                  className="flex items-center gap-1 font-bold text-[10px] bg-accent-light text-accent hover:bg-accent hover:text-white px-2 py-0.5 rounded-full border border-accent/30 transition-all cursor-pointer"
+                                  title="Klik untuk ubah poin task (Mode HR/PO)"
+                                >
+                                  <FaStar size={9} /> {task.point} SP
+                                </button>
+                              ) : (
+                                <span className="font-bold text-[10px] bg-accent-light text-accent px-2 py-0.5 rounded-full border border-accent/20">
+                                  {task.point} SP
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Assignee Footer & Quick Status Picker */}
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px]">
+                                  {task.assignee.charAt(0)}
+                                </div>
+                                <span className="text-[11px] font-medium text-gray-600 truncate max-w-[80px]">
+                                  {task.assignee}
+                                </span>
+                              </div>
+
+                              {/* Dropdown pemindah status cepat */}
+                              <select
+                                value={task.status}
+                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                className="text-[10px] font-semibold bg-gray-50 border border-gray-200 rounded-lg px-1.5 py-0.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                              >
+                                {STATUSES.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Tombol Aksi Khusus jika berada di QA */}
+                            {task.status === "QA" && (
+                              <div className="pt-1 flex gap-1.5 border-t border-gray-50">
+                                <button
+                                  onClick={() => handleRejectQA(task.id)}
+                                  className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-red-50 text-red-600 hover:bg-red-100 p-1 rounded-lg border border-red-200 cursor-pointer"
+                                  title="Kembalikan task ke Developer karena ada temuan bug"
+                                >
+                                  <FaExclamationTriangle size={9} /> Reject Bug
+                                </button>
+                                <button
+                                  onClick={() => handleStatusChange(task.id, "Done")}
+                                  className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-green-50 text-green-600 hover:bg-green-100 p-1 rounded-lg border border-green-200 cursor-pointer"
+                                >
+                                  <FaCheckCircle size={9} /> Lolos Done
+                                </button>
+                              </div>
                             )}
                           </div>
-
-                          {/* Backward Warning (Jika pernah di-reject QA) */}
-                          {task.backwardCount > 0 && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
-                              <FaRedoAlt size={9} />
-                              <span>Di-reject QA: <b>{task.backwardCount}x</b></span>
-                            </div>
-                          )}
-
-                          {/* Meta: Assignee, Deadline & SLA */}
-                          <div className="pt-2 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-500">
-                            <div className="flex items-center gap-1 font-medium text-gray-700">
-                              <FaUserCircle className="text-primary" />
-                              <span>{task.assignee}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                              <FaCalendarAlt size={9} />
-                              <span>{task.deadline}</span>
-                            </div>
-                          </div>
-
-                          {/* Tombol Aksi Khusus jika berada di QA */}
-                          {task.status === "QA" && (
-                            <div className="pt-1 flex gap-1.5 border-t border-gray-50">
-                              <button
-                                onClick={() => handleRejectQA(task.id)}
-                                className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-red-50 text-red-600 hover:bg-red-100 p-1 rounded-lg border border-red-200 cursor-pointer"
-                                title="Kembalikan task ke Developer karena ada temuan bug"
-                              >
-                                <FaExclamationTriangle size={9} /> Reject Bug
-                              </button>
-                              <button
-                                onClick={() => handleStatusChange(task.id, "Done")}
-                                className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-green-50 text-green-600 hover:bg-green-100 p-1 rounded-lg border border-green-200 cursor-pointer"
-                              >
-                                <FaCheckCircle size={9} /> Lolos Done
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* View Mode: LIST VIEW */}
         {viewMode === "list" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
-                <tr>
-                  <th className="p-4">ID & Judul Task</th>
-                  <th className="p-4">Kategori</th>
-                  <th className="p-4">Assignee</th>
-                  <th className="p-4">SLA / Deadline</th>
-                  <th className="p-4">Point (PO)</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-center">Aksi Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-gray-700">
-                {filteredTasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
-                    <td className="p-4">
-                      <span className="text-[10px] text-gray-400 font-mono block">{task.id}</span>
-                      <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
-                      <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md border ${
-                          CATEGORY_BADGES[task.category]?.bg || "bg-gray-50"
-                        }`}
-                      >
-                        {CATEGORY_BADGES[task.category]?.icon}
-                        {task.category}
-                      </span>
-                    </td>
-                    <td className="p-4 font-medium text-gray-800 flex items-center gap-1.5 mt-2">
-                      <FaUserCircle className="text-primary text-base" /> {task.assignee}
-                    </td>
-                    <td className="p-4">
-                      <p className="font-semibold text-gray-700">{task.deadline}</p>
-                      <span className="text-[10px] text-gray-400">Target SLA: {task.sla}</span>
-                    </td>
-                    <td className="p-4">
-                      {task.point !== null ? (
-                        <span className="font-bold text-accent bg-accent-light px-2.5 py-1 rounded-full text-xs border border-accent/20">
-                          {task.point} SP
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs italic">Pending PO</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
-                          STATUSES.find((s) => s.id === task.status)?.color
-                        }`}
-                      >
-                        {task.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                        className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-700 cursor-pointer"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[720px]">
+                <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
+                  <tr>
+                    <th className="p-4">ID & Judul Task</th>
+                    <th className="p-4">Kategori</th>
+                    <th className="p-4">Assignee</th>
+                    <th className="p-4">SLA / Deadline</th>
+                    <th className="p-4">Point (PO)</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-center">Aksi Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {filteredTasks.map((task) => (
+                    <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
+                      <td className="p-4">
+                        <span className="text-[10px] text-gray-400 font-mono block">{task.id}</span>
+                        <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
+                        <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                            CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                          }`}
+                        >
+                          {task.category}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-gray-800">{task.assignee}</td>
+                      <td className="p-4">
+                        <p className="font-medium text-gray-700">{task.deadline}</p>
+                        <span className="text-[10px] text-gray-400">SLA: {task.sla}</span>
+                      </td>
+                      <td className="p-4">
+                        {isHR ? (
+                          <button
+                            onClick={() => handleOpenPointModal(task)}
+                            className="flex items-center gap-1 font-bold text-xs bg-accent-light text-accent hover:bg-accent hover:text-white px-3 py-1 rounded-full border border-accent/30 transition-all cursor-pointer"
+                            title="Atur Poin Task"
+                          >
+                            <FaStar size={10} /> {task.point} SP
+                          </button>
+                        ) : (
+                          <span className="font-bold text-xs bg-accent-light text-accent px-3 py-1 rounded-full border border-accent/20">
+                            {task.point} SP
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${
+                            STATUSES.find((s) => s.id === task.status)?.bg || "bg-gray-100"
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <select
+                          value={task.status}
+                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                          className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs"
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* MODAL: Tambah Task Baru (Karyawan - Tanpa Input Point) */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800">Tambah Task Baru</h3>
@@ -532,7 +523,7 @@ export default function Tasks() {
                 </div>
 
                 {/* Kategori & Assignee */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Kategori Task</label>
                     <select
@@ -562,7 +553,7 @@ export default function Tasks() {
                 </div>
 
                 {/* Tanggal & SLA */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Target Deadline</label>
                     <input
@@ -619,7 +610,7 @@ export default function Tasks() {
         {/* MODAL: Atur Poin Task (Khusus HR/PO) */}
         {selectedTaskForPoint && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-xl bg-accent-light text-accent flex items-center justify-center font-bold text-sm">
@@ -651,7 +642,7 @@ export default function Tasks() {
                   <label className="block text-xs font-semibold text-gray-700 mb-2">
                     Pilih Story Point (SP):
                   </label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                     {SP_OPTIONS.map((sp) => (
                       <button
                         key={sp}

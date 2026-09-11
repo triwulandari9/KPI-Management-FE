@@ -47,10 +47,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-8 md:p-10 border border-gray-100">
-        <div className="flex justify-center mb-6">
-          <img src={logo} alt="Assist.id" className="h-10 w-auto object-contain" />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-3 sm:p-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl sm:rounded-3xl shadow-lg p-5 sm:p-8 md:p-10 border border-gray-100">
+        <div className="flex justify-center mb-5 sm:mb-6">
+          <img src={logo} alt="Assist.id" className="h-9 sm:h-10 w-auto object-contain" />
         </div>
 
         {errorMessage && (
@@ -60,7 +60,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleFormLogin} className="flex flex-col gap-4">
+        <form onSubmit={handleFormLogin} className="flex flex-col gap-3.5 sm:gap-4">
           <div>
             <label className="text-xs font-bold text-gray-800 mb-1.5 block">
               Email
@@ -118,22 +118,24 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="flex items-center gap-3 my-5">
+        <div className="flex items-center gap-3 my-4 sm:my-5">
           <div className="flex-1 h-px bg-gray-200"></div>
           <span className="text-xs font-semibold text-gray-400 tracking-wider">ATAU</span>
           <div className="flex-1 h-px bg-gray-200"></div>
         </div>
 
-        <div className="flex flex-col items-center gap-2">
-          <GoogleLogin
-            onSuccess={handleGoogleLogin}
-            onError={() => setErrorMessage("Login Google gagal. Pastikan koneksi internet aktif.")}
-            theme="outline"
-            size="large"
-            width="320"
-            text="continue_with"
-            shape="rectangular"
-          />
+        <div className="flex flex-col items-center gap-2 w-full max-w-full overflow-hidden">
+          <div className="w-full flex justify-center max-w-[280px] sm:max-w-[320px] overflow-hidden">
+            <GoogleLogin
+              onSuccess={handleGoogleLogin}
+              onError={() => setErrorMessage("Login Google gagal. Pastikan koneksi internet aktif.")}
+              theme="outline"
+              size="large"
+              width="280"
+              text="continue_with"
+              shape="rectangular"
+            />
+          </div>
           <p className="text-[11px] text-gray-400 text-center mt-1">
             Masuk dengan akun Google Assist.id
           </p>

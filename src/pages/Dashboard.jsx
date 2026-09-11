@@ -127,7 +127,7 @@ export default function Dashboard() {
       <Header />
       <Sidebar />
 
-      <div className={`${collapsed ? "ml-20" : "ml-64"} pt-16 p-8 transition-all duration-300`}>
+      <main className={`transition-all duration-300 pt-16 p-4 sm:p-6 lg:p-8 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         <PageHeader
           title={isHR ? "Dashboard Admin HR" : "Dashboard Karyawan"}
           subtitle={`Welcome back, ${userName}! • Ringkasan aktivitas dan capaian kinerja sprint`}
@@ -141,23 +141,23 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Stat cards */}
-          <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {statCards.map((card) => (
-              <div key={card.title} className="bg-white rounded-2xl p-5 shadow-xs border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg ${card.bg} ${card.color}`}>
+              <div key={card.title} className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-xs border border-gray-100 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+                <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center text-base sm:text-lg shrink-0 ${card.bg} ${card.color}`}>
                   {card.icon}
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 font-medium">{card.title}</p>
-                  <p className="text-xl font-extrabold text-gray-800">{card.value}</p>
-                  <p className="text-[11px] text-gray-400">{card.sub}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs text-gray-400 font-medium truncate">{card.title}</p>
+                  <p className="text-lg sm:text-xl font-extrabold text-gray-800">{card.value}</p>
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">{card.sub}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Total Point card */}
-          <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-100 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-gray-100 flex flex-col justify-between gap-3">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-gray-800 text-sm">Total Point Sprint</h3>
@@ -165,14 +165,14 @@ export default function Dashboard() {
                   Agustus 2026
                 </span>
               </div>
-              <div className="flex gap-2 mb-3">
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
                 <div className="flex-1">
                   <label className="text-[10px] font-semibold text-gray-400 block mb-1">Start Date</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div className="flex-1">
@@ -181,7 +181,7 @@ export default function Dashboard() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -198,7 +198,7 @@ export default function Dashboard() {
 
         {/* Task list section */}
         <div className="mt-6 flex flex-col gap-3">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
             <h3 className="font-bold text-gray-800 text-base">
               {isHR ? "Daftar Task Seluruh Tim" : "Riwayat Tugas & Progres Saya"}
             </h3>
@@ -220,17 +220,18 @@ export default function Dashboard() {
             displayedTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-white rounded-2xl p-4 md:p-5 shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-wrap md:flex-nowrap items-center justify-between gap-4"
+                className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-gray-100 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4"
               >
-                <div className="flex items-center gap-3.5 min-w-[240px]">
-                  <div className="w-10 h-10 rounded-2xl bg-accent-light flex items-center justify-center text-accent shrink-0">
+                {/* Info Utama Task */}
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-accent-light flex items-center justify-center text-accent shrink-0 mt-0.5 sm:mt-0">
                     <FaLaptopCode size={16} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] text-gray-400 font-mono">{task.id}</span>
-                      <h4 className="font-bold text-gray-800 text-xs md:text-sm">{task.title}</h4>
-                      <span className="text-[10px] font-bold bg-accent-light text-accent border border-accent/20 px-2 py-0.5 rounded-full">
+                      <h4 className="font-bold text-gray-800 text-xs sm:text-sm truncate max-w-[200px] sm:max-w-none">{task.title}</h4>
+                      <span className="text-[10px] font-bold bg-accent-light text-accent border border-accent/20 px-2 py-0.5 rounded-full shrink-0">
                         {task.point} Point
                       </span>
                     </div>
@@ -238,46 +239,49 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="text-xs">
-                  <p className="text-gray-400 text-[10px] font-medium">Start Date</p>
-                  <p className="text-gray-700 font-semibold">{task.start}</p>
-                </div>
-
-                <div className="text-xs">
-                  <p className="text-gray-400 text-[10px] font-medium">Deadline</p>
-                  <p className="text-gray-700 font-semibold">{task.deadline}</p>
-                </div>
-
-                <div>
-                  <p className="text-gray-400 text-[10px] font-medium mb-0.5">Status Tugas</p>
-                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${STATUS_CONFIG[task.status]?.bg || "bg-gray-100 text-gray-700"}`}>
-                    {task.status}
-                  </span>
-                </div>
-
-                {/* Action Buttons: Khusus HR */}
-                {isHR ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setEditingTask({ ...task })}
-                      className="flex items-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer"
-                      title="Ubah data & poin task (Mode HR)"
-                    >
-                      <FaEdit size={11} className="text-primary" /> Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirmId(task.id)}
-                      className="flex items-center gap-1.5 text-xs font-semibold border border-red-200 bg-red-50/50 rounded-xl px-3 py-1.5 text-red-600 hover:bg-red-100/70 transition-all cursor-pointer"
-                      title="Hapus task (Mode HR)"
-                    >
-                      <FaTrashAlt size={11} /> Delete
-                    </button>
+                {/* Metadata & Actions */}
+                <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-5 pt-2 md:pt-0 border-t md:border-t-0 border-gray-50 text-xs">
+                  <div>
+                    <p className="text-gray-400 text-[10px] font-medium">Start Date</p>
+                    <p className="text-gray-700 font-semibold">{task.start}</p>
                   </div>
-                ) : (
-                  <div className="text-[11px] text-gray-400 bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200/60 font-medium">
-                    Riwayat Tugas
+
+                  <div>
+                    <p className="text-gray-400 text-[10px] font-medium">Deadline</p>
+                    <p className="text-gray-700 font-semibold">{task.deadline}</p>
                   </div>
-                )}
+
+                  <div>
+                    <p className="text-gray-400 text-[10px] font-medium mb-0.5">Status Tugas</p>
+                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border ${STATUS_CONFIG[task.status]?.bg || "bg-gray-100 text-gray-700"}`}>
+                      {task.status}
+                    </span>
+                  </div>
+
+                  {/* Action Buttons: Khusus HR */}
+                  {isHR ? (
+                    <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+                      <button
+                        onClick={() => setEditingTask({ ...task })}
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer"
+                        title="Ubah data & poin task (Mode HR)"
+                      >
+                        <FaEdit size={11} className="text-primary" /> Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmId(task.id)}
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold border border-red-200 bg-red-50/50 rounded-xl px-3 py-1.5 text-red-600 hover:bg-red-100/70 transition-all cursor-pointer"
+                        title="Hapus task (Mode HR)"
+                      >
+                        <FaTrashAlt size={11} /> Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-400 bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200/60 font-medium">
+                      Riwayat Tugas
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -286,7 +290,7 @@ export default function Dashboard() {
         {/* MODAL: Edit Task */}
         {editingTask && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <span className="w-8 h-8 rounded-xl bg-primary-light text-primary flex items-center justify-center font-bold text-sm">
@@ -317,7 +321,7 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
                     <input
@@ -348,7 +352,7 @@ export default function Dashboard() {
                       {editingTask.point} SP Terpilih
                     </span>
                   </div>
-                  <div className="grid grid-cols-6 gap-1.5 mb-2">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 mb-2">
                     {SP_OPTIONS.map((sp) => (
                       <button
                         key={sp}
@@ -365,7 +369,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Status Tugas</label>
                     <select
@@ -415,7 +419,7 @@ export default function Dashboard() {
         {/* MODAL: Konfirmasi Hapus Task */}
         {deleteConfirmId && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200 text-center">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in duration-200 text-center">
               <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3 text-lg">
                 <FaTrashAlt />
               </div>
@@ -440,7 +444,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
