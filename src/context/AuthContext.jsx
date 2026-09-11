@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import authService from "../services/authService";
+import { employeeService } from "../services/employeeService";
 
 const AuthContext = createContext();
 
@@ -34,12 +35,28 @@ export function AuthProvider({ children }) {
 
   const [currentUser, setCurrentUser] = useState(() => getValidSessionUser());
 
-  const login = (userData) => {
+  const login = async (userData) => {
     const expiryTime = Date.now() + SESSION_DURATION;
+    // Store basic user info first
     setCurrentUser(userData);
     localStorage.setItem("kpi_user", JSON.stringify(userData));
     localStorage.setItem("kpi_session_expiry", expiryTime.toString());
-    // Dispatch global avatar update event if avatar provided on login
+
+    // If avatar not present, fetch it from employee record (in case backend login response lacks avatar)
+    if (!userData?.avatar) {
+      try {
+        const emp = await employeeService.getEmployeeById(userData._id || userData.id);
+        if (emp?.avatar) {
+          userData = { ...userData, avatar: emp.avatar };
+          setCurrentUser(userData);
+          localStorage.setItem("kpi_user", JSON.stringify(userData));
+        }
+      } catch (e) {
+        console.warn("Failed to sync avatar after login", e);
+      }
+    }
+
+    // Dispatch global avatar update event if avatar provided (now guaranteed if we fetched it)
     if (userData?.avatar) {
       window.dispatchEvent(
         new CustomEvent("user_avatar_updated", {
@@ -78,6 +95,41 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   }, []);
 
+  // -------------------------------
+  // 1️⃣ Refresh user avatar on app start (e.g., page reload / new tab)
+  // -------------------------------
+  useEffect(() => {
+    const token = localStorage.getItem("kpi_token");
+    const storedUser = localStorage.getItem("kpi_user");
+    if (token && storedUser) {
+      // If we already have a user in localStorage, try to ensure avatar is up‑to‑date
+      (async () => {
+        try {
+          const parsed = JSON.parse(storedUser);
+          if (!parsed?.avatar) {
+            const emp = await employeeService.getEmployeeById(parsed._id || parsed.id);
+            if (emp?.avatar) {
+              const updated = { ...parsed, avatar: emp.avatar };
+              setCurrentUser(updated);
+              localStorage.setItem("kpi_user", JSON.stringify(updated));
+              // Broadcast avatar change for other components/tabs
+              window.dispatchEvent(
+                new CustomEvent("user_avatar_updated", {
+                  detail: { avatar: emp.avatar, email: updated.email, id: updated._id || updated.id },
+                })
+              );
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to sync avatar on app init", e);
+        }
+      })();
+    }
+  }, []);
+
+  // -------------------------------
+  // 2️⃣ Existing session‑expiry checker (unchanged)
+  // -------------------------------
   useEffect(() => {
     const checkSession = () => {
       const validUser = getValidSessionUser();
