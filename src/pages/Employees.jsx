@@ -24,6 +24,16 @@ export default function Employees() {
   const { currentUser } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
+  // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
+  const formatName = (name) => {
+    if (!name) return "";
+    return name
+      .toLowerCase()
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
+
   const [employees, setEmployees] = useState([]);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -133,22 +143,22 @@ export default function Employees() {
               <div>
                 {/* Card Top: Avatar & Badge */}
                 <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={emp.avatar}
                       alt={emp.name}
-                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all"
+                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all shrink-0"
                     />
-                    <div>
-                      <h3 className="font-bold text-gray-800 text-sm">{emp.name}</h3>
-                      <p className="text-xs text-primary font-medium">{emp.role}</p>
-                      <span className="text-[10px] text-gray-400 font-mono">{emp.id}</span>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-gray-800 text-sm truncate">{formatName(emp.name)}</h3>
+                      <p className="text-xs text-primary font-medium truncate">{emp.role}</p>
+                      <span className="text-[10px] text-gray-400 font-mono truncate block">{emp.id}</span>
                     </div>
                   </div>
 
                   {/* Level Badge */}
                   <span
-                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shrink-0 ${
                       emp.stats.kpiLevel === 4
                         ? "bg-green-50 text-green-600 border-green-200"
                         : emp.stats.kpiLevel === 3

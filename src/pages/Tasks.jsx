@@ -297,10 +297,10 @@ export default function Tasks() {
                             onDragStart={(e) => handleDragStart(e, task.id)}
                             className="bg-white rounded-xl p-3.5 border border-gray-200/80 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2 group relative"
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-gray-400 font-mono">{task.id}</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] text-gray-400 font-mono truncate min-w-0">{task.id}</span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
                                   CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                                 }`}
                               >

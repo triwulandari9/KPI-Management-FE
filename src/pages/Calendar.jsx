@@ -125,69 +125,21 @@ export default function CalendarPage() {
       <Sidebar />
 
       <main className={`pt-16 p-4 sm:p-6 lg:px-8 lg:pb-4 flex-1 flex flex-col overflow-auto lg:overflow-hidden transition-all duration-300 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
-        {/* Header Kalender Sesuai Desain */}
-        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
-              {MONTH_NAMES[currentMonth]} {currentYear}
-            </h1>
-            <p className="text-gray-400 text-xs font-normal">
-              Manage deadlines and employee schedules.
-            </p>
-          </div>
-
-          {/* Controls: View Mode, Filter Status, Filter Team, Navigasi Bulan */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            {/* View Switch: List | Month | Week */}
-            <div className="bg-gray-100/90 p-1 rounded-xl flex items-center">
-              {["List", "Month", "Week"].map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewType(mode)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    viewType === mode
-                      ? "bg-white text-gray-800 shadow-xs border border-gray-100"
-                      : "text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
+        {/* Header Kalender: Baris 1 = Judul, Baris 2 = Kontrol */}
+        <div className="shrink-0 flex flex-col gap-3 mb-3 sm:mb-4">
+          {/* Baris 1: Judul + Subtitle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
+                {MONTH_NAMES[currentMonth]} {currentYear}
+              </h1>
+              <p className="text-gray-400 text-xs font-normal">
+                Manage deadlines and employee schedules.
+              </p>
             </div>
 
-            {/* Dropdown: All Statuses */}
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
-              >
-                <option value="All Statuses">All Statuses</option>
-                <option value="Backlog">Backlog</option>
-                <option value="Ready">Ready</option>
-                <option value="On Progress">On Progress</option>
-                <option value="Code Review">Code Review</option>
-                <option value="QA">QA</option>
-                <option value="Done">Done</option>
-              </select>
-            </div>
-
-            {/* Dropdown: All Teams */}
-            <div className="relative">
-              <select
-                value={teamFilter}
-                onChange={(e) => setTeamFilter(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
-              >
-                <option value="All Teams">All Teams</option>
-                <option value="Engineering">Engineering</option>
-                <option value="UI/UX">UI/UX</option>
-                <option value="QA">QA</option>
-              </select>
-            </div>
-
-            {/* Navigation Arrows < > & Tombol Hari Ini */}
-            <div className="flex items-center gap-1.5">
+            {/* Navigasi Bulan (selalu tampil di kanan judul) */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={handleToday}
                 className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs"
@@ -213,6 +165,53 @@ export default function CalendarPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Baris 2: View Switch + Filter (bisa wrap) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* View Switch: List | Month | Week */}
+            <div className="bg-gray-100/90 p-1 rounded-xl flex items-center">
+              {["List", "Month", "Week"].map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewType(mode)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    viewType === mode
+                      ? "bg-white text-gray-800 shadow-xs border border-gray-100"
+                      : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+
+            {/* Dropdown: All Statuses */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
+            >
+              <option value="All Statuses">All Statuses</option>
+              <option value="Backlog">Backlog</option>
+              <option value="Ready">Ready</option>
+              <option value="On Progress">On Progress</option>
+              <option value="Code Review">Code Review</option>
+              <option value="QA">QA</option>
+              <option value="Done">Done</option>
+            </select>
+
+            {/* Dropdown: All Teams */}
+            <select
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs"
+            >
+              <option value="All Teams">All Teams</option>
+              <option value="Engineering">Engineering</option>
+              <option value="UI/UX">UI/UX</option>
+              <option value="QA">QA</option>
+            </select>
           </div>
         </div>
 
