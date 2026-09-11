@@ -28,25 +28,6 @@ export default function Employees() {
   const { currentUser, updateUserProfile } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
-  // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
-  const formatName = (name) => {
-    if (!name) return "";
-    return name
-      .toLowerCase()
-      .split(" ")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  };
-
-  // Helper untuk generate avatar inisial jika foto belum ada / kosong
-  const getAvatarUrl = (emp) => {
-    if (emp?.avatar && typeof emp.avatar === "string" && emp.avatar.trim().length > 0) {
-      return emp.avatar;
-    }
-    const name = emp?.name || "User";
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&bold=true&rounded=true`;
-  };
-
   const [employees, setEmployees] = useState([]);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -99,7 +80,13 @@ export default function Employees() {
       }
     }
     loadEmployees();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
 
+  // Listen for avatar updates to refresh employee list instantly (custom event)
+  useEffect(() => {
     const handleAvatarUpdated = (event) => {
       const { avatar, email, id } = event.detail || {};
       if (avatar) {
@@ -120,53 +107,53 @@ export default function Employees() {
     };
 
     window.addEventListener("user_avatar_updated", handleAvatarUpdated);
-
     return () => {
-      isMounted = false;
       window.removeEventListener("user_avatar_updated", handleAvatarUpdated);
     };
   }, [currentUser]);
 
   // Cross‑tab avatar sync via localStorage
   useEffect(() => {
-    const handleStorage = (e) => {
+    const handleStorage = async (e) => {
       if (e.key === "kpi_avatar_updated" && e.newValue) {
         // Refresh employee list to get updated avatar URLs
-        (async () => {
-          try {
-            const data = await employeeService.getEmployees({ _t: Date.now() });
+        try {
+          const data = await employeeService.getEmployees({ _t: Date.now() });
+          if (data) {
             setEmployees(data);
-          } catch (err) {
-            console.error("Failed to refresh employees after avatar update:", err);
           }
-        })();
+        } catch (err) {
+          console.error("Failed to refresh employees after avatar update:", err);
+        }
       }
     };
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
-// Polling to refresh employee data globally every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const freshData = await employeeService.getEmployees({ _t: Date.now() });
-        if (Array.isArray(freshData) && freshData.length) {
-          setEmployees(freshData);
-        }
-      } catch (err) {
-        console.error("Polling error fetching employees:", err);
-      }
-    }, 10000); // 10 seconds
-    return () => clearInterval(interval);
-  }, []);
+  // Format string Nama agar huruf pertama kapital
+  const formatName = (str) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
-  const filteredEmployees = employees.filter((emp) => {
-    return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;
-  });
+  // Helper untuk generate avatar inisial jika foto belum ada / kosong
+  const getAvatarUrl = (emp) => {
+    if (emp?.avatar && typeof emp.avatar === "string" && emp.avatar.trim().length > 0) {
+      return emp.avatar;
+    }
+    const name = emp?.name || "User";
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&bold=true&rounded=true`;
+  };
 
-  // Kompresi foto agar ukuran string Base64 kecil (~20-40KB) sehingga selalu diterima oleh database backend
-  const compressImageFile = (file, maxWidth = 300, maxHeight = 300, quality = 0.75) => {
+  // Fungsi Kompresi Foto agar Base64 berukuran kecil (~20-40KB) dan aman di database
+  const compressImage = (file, maxWidth = 400, maxHeight = 400, quality = 0.7) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -195,16 +182,17 @@ export default function Employees() {
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
 
+          // Convert to compressed jpeg base64
           const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
           resolve(compressedBase64);
         };
-        img.onerror = () => resolve(event.target.result);
+        img.onerror = (err) => reject(err);
       };
       reader.onerror = (err) => reject(err);
     });
   };
 
-  // Validasi & Upload Foto (JPG, JPEG, PNG, Maks 2MB)
+  // Handle upload & validasi foto avatar (Modal Tambah & Modal Edit)
   const handleAvatarChange = async (e, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -227,13 +215,14 @@ export default function Employees() {
 
     setAvatarError("");
     try {
-      const base64Url = await compressImageFile(file, 300, 300, 0.75);
+      const base64Url = await compressImage(file, 400, 400, 0.7);
       if (isEdit) {
         setEditFormData((prev) => ({ ...prev, avatar: base64Url }));
       } else {
         setNewEmployee((prev) => ({ ...prev, avatar: base64Url }));
       }
     } catch {
+      // Fallback jika kompresi canvas error
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64Url = reader.result;
@@ -249,10 +238,11 @@ export default function Employees() {
 
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
-    if (!newEmployee.name.trim() || !newEmployee.email.trim()) return;
+    if (!newEmployee.name || !newEmployee.email) return;
 
     const payload = {
       ...newEmployee,
+      name: formatName(newEmployee.name),
       avatar:
         newEmployee.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(newEmployee.name)}&background=3b82f6&color=fff&bold=true`,
@@ -260,7 +250,7 @@ export default function Employees() {
 
     try {
       const created = await employeeService.createEmployee(payload);
-      setEmployees((prev) => [...prev, created]);
+      setEmployees((prev) => [created || payload, ...prev]);
       setIsModalOpen(false);
       setAvatarError("");
       setNewEmployee({
@@ -272,14 +262,10 @@ export default function Employees() {
       });
     } catch (err) {
       console.error("Gagal menambah karyawan:", err);
-      // Fallback local append
+      // Fallback local jika server gagal
       setEmployees((prev) => [
+        { ...payload, id: `EMP-${Date.now().toString().slice(-3)}` },
         ...prev,
-        {
-          id: `EMP-${Date.now().toString().slice(-4)}`,
-          ...payload,
-          stats: { kpiLevel: 3, sprintPoints: 0, totalTasks: 0, onTimeRate: "100%", slaBugRate: "100%" },
-        },
       ]);
       setIsModalOpen(false);
       setAvatarError("");
@@ -293,7 +279,6 @@ export default function Employees() {
     }
   };
 
-  // Buka modal edit penuh (khusus HR)
   const handleOpenEditModal = (emp) => {
     setEditingEmployee(emp);
     setIsPhotoOnlyMode(false);
@@ -307,7 +292,6 @@ export default function Employees() {
     });
   };
 
-  // Buka modal edit foto saja (untuk Karyawan biasa yang ingin ganti fotonya sendiri)
   const handleOpenPhotoOnlyModal = (emp) => {
     setEditingEmployee(emp);
     setIsPhotoOnlyMode(true);
@@ -326,8 +310,45 @@ export default function Employees() {
     if (!editingEmployee) return;
 
     const empId = editingEmployee._id || editingEmployee.id;
+    const isSelf =
+      currentUser &&
+      (currentUser.email === editingEmployee.email ||
+        currentUser._id === empId ||
+        currentUser.id === empId ||
+        currentUser.name?.toLowerCase() === editingEmployee.name?.toLowerCase());
+
     try {
-      const updated = await employeeService.updateEmployee(empId, editFormData);
+      let updated = null;
+      let lastError = null;
+
+      // 1. Coba update via employeeService dengan empId
+      try {
+        updated = await employeeService.updateEmployee(empId, editFormData);
+      } catch (err1) {
+        lastError = err1;
+        // 2. Jika gagal dan ini akun sendiri, coba dengan currentUser._id / currentUser.id
+        const currentUserId = currentUser?._id || currentUser?.id;
+        if (isSelf && currentUserId && currentUserId !== empId) {
+          try {
+            updated = await employeeService.updateEmployee(currentUserId, editFormData);
+          } catch (err2) {
+            lastError = err2;
+          }
+        }
+        // 3. Coba juga via authService.updateProfile jika akun sendiri
+        if (!updated && isSelf) {
+          try {
+            updated = await authService.updateProfile(editFormData);
+          } catch (err3) {
+            lastError = err3;
+          }
+        }
+      }
+
+      if (!updated && lastError) {
+        throw lastError;
+      }
+
       setEmployees((prev) =>
         prev.map((emp) =>
           (emp._id || emp.id) === empId
@@ -338,7 +359,7 @@ export default function Employees() {
       if (selectedEmployee && (selectedEmployee._id || selectedEmployee.id) === empId) {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
       }
-      if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
+      if (isSelf) {
         // Update global user profile (dispatches event)
         updateUserProfile?.({ avatar: editFormData.avatar });
         // Also broadcast via localStorage for other tabs (employees list)
@@ -355,34 +376,13 @@ export default function Employees() {
       setAvatarError("");
     } catch (err) {
       console.error("Gagal update data karyawan:", err);
-      // Fallback local update agar UI tetap langsung terupdate
-      setEmployees((prev) =>
-        prev.map((emp) =>
-          (emp._id || emp.id) === empId
-            ? { ...emp, ...editFormData }
-            : emp
-        )
-      );
-      if (selectedEmployee && (selectedEmployee._id || selectedEmployee.id) === empId) {
-        setSelectedEmployee((prev) => ({ ...prev, ...editFormData }));
-      }
-      if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
-        // Update profile locally on error fallback
-        updateUserProfile?.({ avatar: editFormData.avatar });
-        // Broadcast via localStorage for other tabs
-        try {
-          localStorage.setItem(
-            "kpi_avatar_updated",
-            JSON.stringify({ avatar: editFormData.avatar, email: currentUser?.email, id: empId })
-          );
-        } catch (e) {
-          console.warn("Failed to write avatar update to localStorage", e);
-        }
-      }
-      setEditingEmployee(null);
-      setAvatarError("");
+      setAvatarError(err.message || "Gagal menyimpan data karyawan ke database server.");
     }
   };
+
+  const filteredEmployees = employees.filter((emp) => {
+    return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;
+  });
 
   return (
     <div className="bg-gray-50 min-h-screen">

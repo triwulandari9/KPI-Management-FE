@@ -115,55 +115,86 @@ export default function Header() {
     setPhotoError("");
 
     try {
+      const payload = {
+        name: currentUser?.name || "",
+        email: currentUser?.email || "",
+        role: currentUser?.role || currentUser?.position || "karyawan",
+        position: currentUser?.position || currentUser?.role || "Staff",
+        department: currentUser?.department || "General",
+        avatar: newAvatarPreview,
+      };
+
       let savedSuccessfully = false;
-      let targetEmpId = currentUser?._id || currentUser?.id;
+      let lastError = null;
 
-      // 1. Coba update via endpoint profil user terlebih dahulu (dapat diakses Karyawan & HR)
-      try {
-        await authService.updateProfile({ avatar: newAvatarPreview });
-        savedSuccessfully = true;
-      } catch (authErr) {
-        console.warn("Update via authService.updateProfile gagal/belum tersedia:", authErr.message);
-      }
+      // Kumpulkan kemungkinan ID target (ID User dan ID Dokumen Employee jika berbeda)
+      const primaryId = currentUser?._id || currentUser?.id;
+      let matchedEmpId = primaryId;
 
-      // 2. Coba update via employeeService.updateEmployee jika step 1 belum berhasil atau untuk sinkronisasi Employee
       try {
-        let matchedEmpId = targetEmpId;
-        try {
-          const allEmployees = await employeeService.getEmployees();
-          if (Array.isArray(allEmployees) && allEmployees.length > 0) {
-            const matched = allEmployees.find(
-              (emp) =>
-                (emp.email && currentUser?.email && emp.email.toLowerCase() === currentUser.email.toLowerCase()) ||
-                (emp.name && currentUser?.name && emp.name.toLowerCase() === currentUser.name.toLowerCase()) ||
-                (emp._id && (emp._id === targetEmpId || emp._id === currentUser?.id)) ||
-                (emp.id && (emp.id === targetEmpId || emp.id === currentUser?.id))
-            );
-            if (matched) {
-              matchedEmpId = matched._id || matched.id;
-              targetEmpId = matchedEmpId;
-            }
+        const allEmployees = await employeeService.getEmployees();
+        if (Array.isArray(allEmployees) && allEmployees.length > 0) {
+          const matched = allEmployees.find(
+            (emp) =>
+              (emp.email && currentUser?.email && emp.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+              (emp.name && currentUser?.name && emp.name.toLowerCase() === currentUser.name.toLowerCase()) ||
+              (emp._id && (emp._id === primaryId || emp._id === currentUser?.id)) ||
+              (emp.id && (emp.id === primaryId || emp.id === currentUser?.id))
+          );
+          if (matched && (matched._id || matched.id)) {
+            matchedEmpId = matched._id || matched.id;
           }
-        } catch (findErr) {
-          // Employee lookup might fail for non-HR roles
         }
-
-        if (matchedEmpId) {
-          await employeeService.updateEmployee(matchedEmpId, { avatar: newAvatarPreview });
-          savedSuccessfully = true;
-        }
-      } catch (empErr) {
-        console.warn("Update via employeeService.updateEmployee gagal:", empErr.message);
+      } catch (findErr) {
+        console.warn("Lookup employee list:", findErr.message);
       }
 
-      // 3. Update profile di state lokal & localStorage
+      // 1. Coba update via employeeService dengan matchedEmpId (ID Employee di database)
+      if (matchedEmpId) {
+        try {
+          await employeeService.updateEmployee(matchedEmpId, payload);
+          savedSuccessfully = true;
+        } catch (err1) {
+          lastError = err1;
+          console.warn("Gagal update via matchedEmpId:", err1.message);
+        }
+      }
+
+      // 2. Jika gagal dan primaryId berbeda dari matchedEmpId, coba update via primaryId (User ID)
+      if (!savedSuccessfully && primaryId && primaryId !== matchedEmpId) {
+        try {
+          await employeeService.updateEmployee(primaryId, payload);
+          savedSuccessfully = true;
+        } catch (err2) {
+          lastError = err2;
+          console.warn("Gagal update via primaryId:", err2.message);
+        }
+      }
+
+      // 3. Jika belum berhasil, coba via authService.updateProfile
+      if (!savedSuccessfully) {
+        try {
+          await authService.updateProfile(payload);
+          savedSuccessfully = true;
+        } catch (err3) {
+          lastError = err3;
+          console.warn("Gagal update via updateProfile:", err3.message);
+        }
+      }
+
+      // Jika semua percobaan ke server gagal, lemparkan error agar ditampilkan di modal
+      if (!savedSuccessfully) {
+        throw lastError || new Error("Gagal menyimpan foto ke server. Server menolak perubahan.");
+      }
+
+      // Update state lokal & localStorage setelah terkonfirmasi berhasil tersimpan di server
       updateUserProfile({ avatar: newAvatarPreview });
 
-      // 4. Notifikasi agar komponen lain langsung memperbarui tampilan kartu
+      // Notifikasi agar komponen lain langsung memperbarui tampilan kartu
       try {
         localStorage.setItem(
           "kpi_avatar_updated",
-          JSON.stringify({ avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId })
+          JSON.stringify({ avatar: newAvatarPreview, email: currentUser?.email, id: matchedEmpId || primaryId })
         );
       } catch (e) {
         console.warn("Failed to write avatar update to localStorage", e);
@@ -171,19 +202,15 @@ export default function Header() {
 
       window.dispatchEvent(
         new CustomEvent("user_avatar_updated", {
-          detail: { avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId },
+          detail: { avatar: newAvatarPreview, email: currentUser?.email, id: matchedEmpId || primaryId },
         })
       );
-
-      if (!savedSuccessfully) {
-        console.warn("Catatan: Foto tersimpan lokal, namun backend server belum menyediakan izin penyimpanan permanen.");
-      }
 
       setIsPhotoModalOpen(false);
     } catch (err) {
       console.error("Gagal simpan avatar ke server database:", err);
       setPhotoError(
-        err.message || "Gagal menyimpan foto profil ke server database. Silakan coba lagi."
+        err.message || "Gagal menyimpan foto profil ke server database. Periksa izin akses akun Anda."
       );
     } finally {
       setIsSaving(false);
