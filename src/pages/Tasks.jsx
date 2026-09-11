@@ -18,6 +18,8 @@ import {
   FaLightbulb,
   FaChevronDown,
   FaInbox,
+  FaShieldAlt,
+  FaUserCheck,
 } from "react-icons/fa";
 
 import Header from "../layouts/Header";
@@ -51,7 +53,18 @@ const CATEGORY_BADGES = {
 export default function Tasks() {
   const { collapsed } = useSidebar();
   const { currentUser } = useAuth();
-  const isHR = currentUser?.role?.toUpperCase() === "HR";
+
+  // Role & Permission Checks
+  const userRole = (currentUser?.role || "").toUpperCase();
+  const userPosition = (currentUser?.position || "").toLowerCase();
+  const isPO =
+    userRole === "PO" ||
+    userPosition.includes("product owner") ||
+    userPosition.includes("po") ||
+    (currentUser?.role || "").toLowerCase().includes("product owner");
+  const isHR = userRole === "HR";
+  const isRegularEmployee = !isPO && !isHR;
+  const canSetPoint = isPO || isHR;
 
   // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
   const formatName = (name) => {
@@ -63,6 +76,9 @@ export default function Tasks() {
       .join(" ");
   };
 
+  const currentUserName = formatName(currentUser?.name || currentUser?.username || "Saya");
+  const currentUserId = currentUser?._id || currentUser?.id;
+
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
@@ -73,12 +89,12 @@ export default function Tasks() {
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
 
-  // State Form Tambah Task (Sebagai Karyawan - TIDAK ADA input Point)
+  // State Form Tambah Task Baru
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
     category: "Feature",
-    assignee: "Sari",
+    assignee: currentUserName,
     start: "",
     deadline: "",
     sla: "48 Jam",
@@ -99,13 +115,6 @@ export default function Tasks() {
           }
           if (employeesData && Array.isArray(employeesData) && employeesData.length > 0) {
             setEmployees(employeesData);
-            const firstEmpName = formatName(employeesData[0]?.name || employeesData[0]?.username);
-            if (firstEmpName) {
-              setNewTask((prev) => ({
-                ...prev,
-                assignee: prev.assignee || firstEmpName,
-              }));
-            }
           }
         }
       } catch (err) {
@@ -118,17 +127,188 @@ export default function Tasks() {
     };
   }, []);
 
+  // Update default assignee saat modal dibuka atau user berganti
+  useEffect(() => {
+    if (currentUser) {
+      setNewTask((prev) => ({
+        ...prev,
+        assignee: formatName(currentUser?.name || currentUser?.username || "Saya"),
+      }));
+    }
+  }, [currentUser]);
+
+  // -------------------------------------------------------------
+  // PRIVACY & VISIBILITY RULES (Private Task Access)
+  // -------------------------------------------------------------
+  // 1. Pembuat Task (assignedBy / creator) dapat melihat task yang dibuatnya.
+  // 2. Penerima Task (employee / assignee) dapat melihat task yang di-assign padanya.
+  // 3. User TIDAK BISA melihat task milik orang lain di luar kedua kondisi di atas.
+  const isTaskCreator = (task) => {
+    if (!task || !currentUser) return false;
+    const cId = currentUser._id || currentUser.id;
+    const cEmail = currentUser.email?.toLowerCase();
+    const cName = currentUser.name?.toLowerCase();
+    const cUsername = currentUser.username?.toLowerCase();
+
+    const assignedBy =
+      task.assignedBy ||
+      task.assigned_by ||
+      task.creator ||
+      task.createdBy ||
+      task.creatorId ||
+      task.creatorName;
+
+    if (!assignedBy) return false;
+
+    if (typeof assignedBy === "object") {
+      const creatorId = assignedBy._id || assignedBy.id;
+      const creatorEmail = assignedBy.email?.toLowerCase();
+      const creatorName = (assignedBy.name || assignedBy.username)?.toLowerCase();
+      return (
+        (cId && creatorId && String(cId) === String(creatorId)) ||
+        (cEmail && creatorEmail && cEmail === creatorEmail) ||
+        (cName && creatorName && cName === creatorName)
+      );
+    }
+
+    const assignedByStr = String(assignedBy).toLowerCase().trim();
+    return (
+      (cId && String(cId).toLowerCase() === assignedByStr) ||
+      (cEmail && cEmail === assignedByStr) ||
+      (cName && cName === assignedByStr) ||
+      (cUsername && cUsername === assignedByStr)
+    );
+  };
+
+  const isTaskAssignee = (task) => {
+    if (!task || !currentUser) return false;
+    const cId = currentUser._id || currentUser.id;
+    const cEmail = currentUser.email?.toLowerCase();
+    const cName = currentUser.name?.toLowerCase();
+    const cUsername = currentUser.username?.toLowerCase();
+
+    const assignee =
+      task.assignee ||
+      task.employee ||
+      task.assigneeId ||
+      task.employeeId ||
+      task.assigneeName;
+
+    if (!assignee) return false;
+
+    if (typeof assignee === "object") {
+      const empId = assignee._id || assignee.id;
+      const empEmail = assignee.email?.toLowerCase();
+      const empName = (assignee.name || assignee.username)?.toLowerCase();
+      return (
+        (cId && empId && String(cId) === String(empId)) ||
+        (cEmail && empEmail && cEmail === empEmail) ||
+        (cName && empName && cName === empName)
+      );
+    }
+
+    const assigneeStr = String(assignee).toLowerCase().trim();
+    return (
+      (cId && String(cId).toLowerCase() === assigneeStr) ||
+      (cEmail && cEmail === assigneeStr) ||
+      (cName && cName === assigneeStr) ||
+      (cUsername && cUsername === assigneeStr)
+    );
+  };
+
+  // Rule Utama: User hanya dapat melihat task jika ia adalah Pembuat ATAU Penerima
   const userCanSee = (task) => {
-    if (isHR) return true;
-    const isCreator = task.creator && task.creator === currentUser?.id;
-    const isAssignee = task.assignee && task.assignee === currentUser?.username;
-    return isCreator || isAssignee;
+    return isTaskCreator(task) || isTaskAssignee(task);
   };
 
   const filteredTasks = tasks
     .filter(userCanSee)
     .filter((task) => selectedCategory === "All" || task.category === selectedCategory);
 
+  // -------------------------------------------------------------
+  // PILIHAN ASSIGNEE BERDASARKAN ROLE PENGGUNA
+  // -------------------------------------------------------------
+  // - PO: Dapat assign ke Diri Sendiri, Karyawan Lain, atau HR
+  // - Karyawan Biasa: Dapat assign ke Diri Sendiri atau HR
+  // - HR: Dapat assign ke Diri Sendiri atau HR
+  const getAssigneeOptions = () => {
+    const currentName = formatName(currentUser?.name || "Saya");
+    const currentId = currentUser?._id || currentUser?.id;
+
+    if (isPO) {
+      if (employees && employees.length > 0) {
+        return employees.map((emp) => {
+          const formatted = formatName(emp.name || emp.username);
+          const roleName = emp.position || emp.role || "Karyawan";
+          const isMe =
+            (emp.email && emp.email === currentUser?.email) ||
+            (emp._id && (emp._id === currentId || emp._id === currentUser?.id)) ||
+            (emp.id && (emp.id === currentId || emp.id === currentUser?.id)) ||
+            formatted.toLowerCase() === currentName.toLowerCase();
+          return {
+            value: formatted,
+            label: isMe ? `${formatted} (Saya - PO)` : `${formatted} (${roleName})`,
+            empId: emp._id || emp.id,
+          };
+        });
+      }
+      return [
+        { value: currentName, label: `${currentName} (Saya - PO)`, empId: currentId },
+        { value: "Musa", label: "Musa (Backend Developer)", empId: "musa" },
+        { value: "Mitha", label: "Mitha (UI/UX Designer)", empId: "mitha" },
+        { value: "Admin HR", label: "Admin HR (HR)", empId: "hr" },
+      ];
+    }
+
+    if (isRegularEmployee) {
+      const options = [
+        {
+          value: currentName,
+          label: `${currentName} (Saya - Untuk Diri Sendiri)`,
+          empId: currentId,
+        },
+      ];
+
+      const hrEmployees = employees.filter(
+        (emp) =>
+          emp.role?.toUpperCase() === "HR" ||
+          emp.position?.toUpperCase() === "HR" ||
+          emp.department?.toUpperCase() === "HR" ||
+          emp.name?.toLowerCase().includes("hr")
+      );
+
+      if (hrEmployees.length > 0) {
+        hrEmployees.forEach((hr) => {
+          const formatted = formatName(hr.name || hr.username);
+          if (formatted.toLowerCase() !== currentName.toLowerCase()) {
+            options.push({
+              value: formatted,
+              label: `${formatted} (HR)`,
+              empId: hr._id || hr.id,
+            });
+          }
+        });
+      } else {
+        options.push({
+          value: "Admin HR",
+          label: "Admin HR (HR)",
+          empId: "hr-admin",
+        });
+      }
+
+      return options;
+    }
+
+    // Jika HR
+    const options = [
+      {
+        value: currentName,
+        label: `${currentName} (Saya - HR)`,
+        empId: currentId,
+      },
+    ];
+    return options;
+  };
 
   const handleSavePoint = async (e) => {
     e.preventDefault();
@@ -143,6 +323,11 @@ export default function Tasks() {
       );
     } catch (err) {
       console.error("Gagal menyimpan poin:", err);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === selectedTaskForPoint.id ? { ...t, point: Number(inputPoint) } : t
+        )
+      );
     } finally {
       setSelectedTaskForPoint(null);
     }
@@ -181,18 +366,43 @@ export default function Tasks() {
     e.preventDefault();
     if (!newTask.title.trim()) return;
 
+    const currentName = formatName(currentUser?.name || currentUser?.username || "User");
+    const currentId = currentUser?._id || currentUser?.id;
+
+    // Cari target assignee ID jika tersedia di daftar karyawan
+    const matchedAssignee = employees.find(
+      (emp) =>
+        formatName(emp.name || emp.username).toLowerCase() === newTask.assignee.toLowerCase() ||
+        (emp._id && String(emp._id) === String(newTask.assignee)) ||
+        (emp.id && String(emp.id) === String(newTask.assignee))
+    );
+
+    const taskPayload = {
+      ...newTask,
+      title: newTask.title.trim(),
+      description: newTask.description?.trim() || "",
+      assignee: newTask.assignee || currentName,
+      employee: matchedAssignee?._id || matchedAssignee?.id || newTask.assignee || currentName,
+      assigneeId: matchedAssignee?._id || matchedAssignee?.id,
+      assignedBy: currentName,
+      creator: currentId,
+      creatorName: currentName,
+      creatorEmail: currentUser?.email,
+      start: newTask.start || new Date().toISOString().split("T")[0],
+    };
+
     try {
-      const created = await taskService.createTask({ ...newTask, creator: currentUser?.id });
-      setTasks((prev) => [created, ...prev]);
+      const created = await taskService.createTask(taskPayload);
+      setTasks((prev) => [
+        created || { ...taskPayload, id: `TASK-${Date.now().toString().slice(-4)}` },
+        ...prev,
+      ]);
       setIsModalOpen(false);
-      const defaultAssignee = employees.length > 0
-        ? formatName(employees[0].name || employees[0].username)
-        : "Sari";
       setNewTask({
         title: "",
         description: "",
         category: "Feature",
-        assignee: defaultAssignee,
+        assignee: currentName,
         start: "",
         deadline: "",
         sla: "48 Jam",
@@ -200,6 +410,23 @@ export default function Tasks() {
       });
     } catch (err) {
       console.error("Gagal membuat task baru:", err);
+      // Fallback local jika server offline
+      const localTask = {
+        ...taskPayload,
+        id: `TASK-${Date.now().toString().slice(-4)}`,
+      };
+      setTasks((prev) => [localTask, ...prev]);
+      setIsModalOpen(false);
+      setNewTask({
+        title: "",
+        description: "",
+        category: "Feature",
+        assignee: currentName,
+        start: "",
+        deadline: "",
+        sla: "48 Jam",
+        status: "Backlog",
+      });
     }
   };
 
@@ -211,6 +438,9 @@ export default function Tasks() {
       );
     } catch (err) {
       console.error("Gagal mengubah status task:", err);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+      );
     }
   };
 
@@ -230,6 +460,17 @@ export default function Tasks() {
       );
     } catch (err) {
       console.error("Gagal reject QA:", err);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status: "On Progress",
+                backwardCount: (t.backwardCount || 0) + 1,
+              }
+            : t
+        )
+      );
     }
   };
 
@@ -271,14 +512,39 @@ export default function Tasks() {
 
       <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
-        <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian tim pengembang">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer w-full sm:w-auto justify-center"
-          >
-            <FaPlus size={12} /> Tambah Task Baru
-          </button>
+        <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian dengan akses privat">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {/* Status Akses / Role Badge */}
+            <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 shadow-2xs">
+              <FaShieldAlt className={isPO ? "text-amber-500" : isHR ? "text-purple-500" : "text-primary"} />
+              <span>
+                Mode: <b>{isPO ? "Product Owner" : isHR ? "HR" : "Karyawan"}</b>
+              </span>
+            </div>
+
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer justify-center"
+            >
+              <FaPlus size={12} /> Tambah Task Baru
+            </button>
+          </div>
         </PageHeader>
+
+        {/* Banner Penjelasan Hak Akses Privat */}
+        <div className="mb-5 p-3.5 bg-white border border-blue-100 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 text-xs text-gray-600">
+            <div className="w-7 h-7 rounded-xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
+              <FaShieldAlt size={13} />
+            </div>
+            <span>
+              <b>Akses Privat Aktif:</b> Anda hanya melihat task yang <b>Anda buat</b> (<i>assignedBy</i>) atau task yang <b>ditugaskan kepada Anda</b> (<i>assignee</i>).
+            </span>
+          </div>
+          <span className="text-[11px] font-bold text-primary bg-blue-50 px-2.5 py-1 rounded-full shrink-0 hidden sm:inline-block">
+            {filteredTasks.length} Task Ditampilkan
+          </span>
+        </div>
 
         {/* Toolbar & Filter Bar */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
@@ -364,6 +630,10 @@ export default function Tasks() {
                       ) : (
                         colTasks.map((task) => {
                           const assigneeInfo = getAssigneeInfo(task.assignee);
+                          const isCreator = isTaskCreator(task);
+                          const isAssignee = isTaskAssignee(task);
+                          const taskCreatorName = task.assignedBy || task.creatorName || "Atasan / PO";
+
                           return (
                             <div
                               key={task.id}
@@ -386,6 +656,23 @@ export default function Tasks() {
                                 </span>
                               </div>
 
+                              {/* Label Relasi Kepemilikan Task */}
+                              <div className="flex items-center">
+                                {isCreator && isAssignee ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                                    <FaUserCheck size={10} className="text-gray-500" /> Tugas Mandiri
+                                  </span>
+                                ) : isCreator ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                                    <FaUserCircle size={10} className="text-indigo-500" /> Diberikan ke {task.assignee}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                                    <FaUserCircle size={10} className="text-emerald-500" /> Dari: {taskCreatorName}
+                                  </span>
+                                )}
+                              </div>
+
                               {/* Judul & Deskripsi */}
                               <div>
                                 <h4 className="text-[13px] font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug line-clamp-2">
@@ -404,15 +691,15 @@ export default function Tasks() {
                                   <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline || "Tanpa deadline"}
                                 </span>
 
-                                {/* Badge Poin (Bisa diklik khusus HR/PO untuk atur nilai poin) */}
-                                {isHR ? (
+                                {/* Badge Poin (Bisa diklik khusus PO / HR untuk atur nilai poin) */}
+                                {canSetPoint ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenPointModal(task);
                                     }}
                                     className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200/80 transition-all cursor-pointer shadow-2xs"
-                                    title="Klik untuk ubah poin task (Mode HR/PO)"
+                                    title="Klik untuk ubah poin task (Mode PO / HR)"
                                   >
                                     <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
                                   </button>
@@ -493,21 +780,25 @@ export default function Tasks() {
         {viewMode === "list" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[920px]">
+              <table className="w-full text-left text-xs min-w-[960px]">
                 <thead className="bg-gray-50/90 border-b border-gray-100 text-gray-500 font-semibold sticky top-0 z-10">
                   <tr>
-                    <th className="p-4 min-w-[220px]">ID & Judul Task</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px]">Kategori</th>
-                    <th className="p-4 whitespace-nowrap min-w-[120px]">Assignee</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px]">SLA / Deadline</th>
-                    <th className="p-4 whitespace-nowrap min-w-[110px] text-center">Point (PO)</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px] text-center">Status</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px] text-center">Aksi Status</th>
+                    <th className="p-4 min-w-[200px]">ID & Judul Task</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px]">Kategori</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px]">Dibuat Oleh (PO/User)</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px]">Assignee (Penerima)</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px]">SLA / Deadline</th>
+                    <th className="p-4 whitespace-nowrap min-w-[110px] text-center">Point (SP)</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px] text-center">Status</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px] text-center">Aksi Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
                   {filteredTasks.map((task) => {
                     const assigneeInfo = getAssigneeInfo(task.assignee);
+                    const isCreator = isTaskCreator(task);
+                    const creatorName = task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO");
+
                     return (
                       <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
                         <td className="p-4">
@@ -527,6 +818,13 @@ export default function Tasks() {
                             {CATEGORY_BADGES[task.category]?.label || task.category}
                           </span>
                         </td>
+                        {/* Dibuat Oleh */}
+                        <td className="p-4 whitespace-nowrap">
+                          <span className="font-medium text-gray-800 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 text-xs">
+                            {creatorName}
+                          </span>
+                        </td>
+                        {/* Assignee */}
                         <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <img
@@ -545,11 +843,11 @@ export default function Tasks() {
                           <span className="text-[10px] text-gray-400">SLA: {task.sla || "48 Jam"}</span>
                         </td>
                         <td className="p-4 text-center whitespace-nowrap">
-                          {isHR ? (
+                          {canSetPoint ? (
                             <button
                               onClick={() => handleOpenPointModal(task)}
                               className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-3 py-1 rounded-full border border-amber-200/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
-                              title="Atur Poin Task"
+                              title="Atur Poin Task (PO / HR)"
                             >
                               <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
                             </button>
@@ -596,14 +894,20 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* MODAL: Tambah Task Baru (Karyawan - Tanpa Input Point) */}
+        {/* MODAL: Tambah Task Baru */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800">Tambah Task Baru</h3>
-                  <p className="text-xs text-gray-400">Buat tugas baru untuk tim pengembang</p>
+                  <p className="text-xs text-gray-400">
+                    {isPO
+                      ? "Mode PO: Buat task untuk Diri Sendiri, Karyawan, atau HR"
+                      : isHR
+                      ? "Mode HR: Buat task untuk Diri Sendiri atau HR"
+                      : "Mode Karyawan: Buat task untuk Diri Sendiri atau berikan ke HR"}
+                  </p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
@@ -659,7 +963,7 @@ export default function Tasks() {
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Assignee <span className="text-red-500">*</span>
+                      Penerima Task (Assignee) <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={newTask.assignee}
@@ -667,23 +971,11 @@ export default function Tasks() {
                       className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
                       required
                     >
-                      {employees && employees.length > 0 ? (
-                        employees.map((emp) => {
-                          const formatted = formatName(emp.name || emp.username);
-                          const roleName = emp.position || emp.role || "Developer";
-                          return (
-                            <option key={emp._id || emp.id} value={formatted}>
-                              {formatted} ({roleName})
-                            </option>
-                          );
-                        })
-                      ) : (
-                        <>
-                          <option value="Sari">Sari (Frontend Developer)</option>
-                          <option value="Musa">Musa (Backend Developer)</option>
-                          <option value="Mitha">Mitha (UI/UX Designer)</option>
-                        </>
-                      )}
+                      {getAssigneeOptions().map((opt) => (
+                        <option key={opt.empId || opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -715,11 +1007,11 @@ export default function Tasks() {
                   </div>
                 </div>
 
-                {/* Info Catatan tentang Poin */}
+                {/* Info Catatan tentang Akses & Poin */}
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-[11px] text-blue-700 flex items-start gap-2.5">
                   <FaLightbulb className="text-blue-600 shrink-0 text-sm mt-0.5" />
                   <span>
-                    <b>Pemberian Poin (Story Points):</b> Poin untuk task ini akan dinilai dan ditentukan langsung oleh <b>Product Owner (PO) / HR</b> setelah task dibuat.
+                    <b>Privasi & Story Points:</b> Task ini hanya dapat dilihat oleh Anda (sebagai pembuat) dan penerima task. Penilaian Story Points (SP) akan dinilai oleh <b>Product Owner (PO) / HR</b>.
                   </span>
                 </div>
 
@@ -743,7 +1035,8 @@ export default function Tasks() {
             </div>
           </div>
         )}
-        {/* MODAL: Atur Poin Task (Khusus HR/PO) */}
+
+        {/* MODAL: Atur Poin Task (Khusus PO / HR) */}
         {selectedTaskForPoint && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
@@ -753,7 +1046,7 @@ export default function Tasks() {
                     SP
                   </span>
                   <div>
-                    <h3 className="font-bold text-base text-gray-800">Atur Poin Task (Mode HR/PO)</h3>
+                    <h3 className="font-bold text-base text-gray-800">Atur Poin Task (PO / HR)</h3>
                     <p className="text-xs text-gray-400 font-mono">{selectedTaskForPoint.id} • {selectedTaskForPoint.assignee}</p>
                   </div>
                 </div>
