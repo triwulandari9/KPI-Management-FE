@@ -34,7 +34,7 @@ const STATUSES = [
   { id: "Ready", label: "Ready", color: "bg-blue-50 text-blue-600 border-blue-200", dot: "bg-blue-500" },
   { id: "On Progress", label: "On Progress", color: "bg-amber-50 text-amber-600 border-amber-200", dot: "bg-amber-500" },
   { id: "Code Review", label: "Code Review", color: "bg-purple-50 text-purple-600 border-purple-200", dot: "bg-purple-500" },
-  { id: "QA", label: "QA (Quality Assurance)", color: "bg-indigo-50 text-indigo-600 border-indigo-200", dot: "bg-indigo-500" },
+  { id: "QA", label: "QA", color: "bg-indigo-50 text-indigo-600 border-indigo-200", dot: "bg-indigo-500" },
   { id: "Done", label: "Done", color: "bg-green-50 text-green-600 border-green-200", dot: "bg-green-500" },
 ];
 
@@ -273,12 +273,12 @@ export default function Tasks() {
                     }`}
                   >
                     {/* Column Header */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-200 mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`}></span>
-                        <h3 className="text-xs font-bold text-gray-800">{col.label}</h3>
+                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-200 mb-2.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.dot}`}></span>
+                        <h3 className="text-xs font-bold text-gray-800 whitespace-nowrap truncate">{col.label}</h3>
                       </div>
-                      <span className="text-[11px] font-semibold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs">
+                      <span className="text-[11px] font-semibold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs shrink-0">
                         {colTasks.length}
                       </span>
                     </div>
