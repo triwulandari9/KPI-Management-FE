@@ -131,8 +131,47 @@ export default function Employees() {
     return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;
   });
 
+  // Kompresi foto agar ukuran string Base64 kecil (~20-40KB) sehingga selalu diterima oleh database backend
+  const compressImageFile = (file, maxWidth = 300, maxHeight = 300, quality = 0.75) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => resolve(event.target.result);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   // Validasi & Upload Foto (JPG, JPEG, PNG, Maks 2MB)
-  const handleAvatarChange = (e, isEdit = false) => {
+  const handleAvatarChange = async (e, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -153,16 +192,25 @@ export default function Employees() {
     }
 
     setAvatarError("");
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64Url = reader.result;
+    try {
+      const base64Url = await compressImageFile(file, 300, 300, 0.75);
       if (isEdit) {
         setEditFormData((prev) => ({ ...prev, avatar: base64Url }));
       } else {
         setNewEmployee((prev) => ({ ...prev, avatar: base64Url }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Url = reader.result;
+        if (isEdit) {
+          setEditFormData((prev) => ({ ...prev, avatar: base64Url }));
+        } else {
+          setNewEmployee((prev) => ({ ...prev, avatar: base64Url }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleCreateEmployee = async (e) => {

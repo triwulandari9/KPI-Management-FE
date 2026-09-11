@@ -28,13 +28,54 @@ export default function Header() {
     }
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Kompresi foto agar ukuran string Base64 kecil (~20-40KB) sehingga selalu diterima oleh database backend
+  const compressImageFile = (file, maxWidth = 300, maxHeight = 300, quality = 0.75) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => resolve(event.target.result);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleOpenPhotoModal = () => {
     setNewAvatarPreview(currentUser?.avatar || "");
     setPhotoError("");
     setIsPhotoModalOpen(true);
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -55,35 +96,68 @@ export default function Header() {
     }
 
     setPhotoError("");
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewAvatarPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, 300, 300, 0.75);
+      setNewAvatarPreview(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSavePhoto = async (e) => {
     e.preventDefault();
-    updateUserProfile({ avatar: newAvatarPreview });
+    setIsSaving(true);
+    setPhotoError("");
 
-    // Update avatar ke backend database
-    const empId = currentUser?._id || currentUser?.id;
-    if (empId) {
+    try {
+      // 1. Cari ID karyawan yang cocok di database
+      let targetEmpId = currentUser?._id || currentUser?.id;
       try {
-        await employeeService.updateEmployee(empId, { avatar: newAvatarPreview });
-      } catch (err) {
-        console.warn("Gagal update avatar ke server database:", err);
+        const allEmployees = await employeeService.getEmployees();
+        if (Array.isArray(allEmployees) && allEmployees.length > 0) {
+          const matched = allEmployees.find(
+            (emp) =>
+              (emp.email && currentUser?.email && emp.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+              (emp.name && currentUser?.name && emp.name.toLowerCase() === currentUser.name.toLowerCase()) ||
+              (emp._id && emp._id === targetEmpId) ||
+              (emp.id && emp.id === targetEmpId)
+          );
+          if (matched) {
+            targetEmpId = matched._id || matched.id;
+          }
+        }
+      } catch (findErr) {
+        console.warn("Gagal lookup employee ID:", findErr);
       }
+
+      // 2. Simpan ke backend database
+      if (targetEmpId) {
+        await employeeService.updateEmployee(targetEmpId, { avatar: newAvatarPreview });
+      }
+
+      // 3. Update profile di state lokal & localStorage
+      updateUserProfile({ avatar: newAvatarPreview });
+
+      // 4. Notifikasi agar komponen seperti Employees.jsx langsung memperbarui tampilan kartu
+      window.dispatchEvent(
+        new CustomEvent("user_avatar_updated", {
+          detail: { avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId },
+        })
+      );
+
+      setIsPhotoModalOpen(false);
+    } catch (err) {
+      console.error("Gagal simpan avatar ke server database:", err);
+      // Tetap update lokal jika ada kendala koneksi
+      updateUserProfile({ avatar: newAvatarPreview });
+      setIsPhotoModalOpen(false);
+    } finally {
+      setIsSaving(false);
     }
-
-    // Notifikasi agar komponen seperti Employees.jsx langsung memperbarui tampilan kartu
-    window.dispatchEvent(
-      new CustomEvent("user_avatar_updated", {
-        detail: { avatar: newAvatarPreview, email: currentUser?.email, id: empId },
-      })
-    );
-
-    setIsPhotoModalOpen(false);
   };
 
   return (
