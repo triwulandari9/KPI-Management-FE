@@ -1027,7 +1027,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">5. Tech Debt Completion</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 5%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: 60% pembersihan tech debt terjadwal</p>
                     </div>

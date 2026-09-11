@@ -399,7 +399,7 @@ export default function Tasks() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[920px]">
-                <thead className="bg-gray-50/90 border-b border-gray-100 text-gray-500 font-semibold">
+                <thead className="bg-gray-50/90 border-b border-gray-100 text-gray-500 font-semibold sticky top-0 z-10">
                   <tr>
                     <th className="p-4 min-w-[220px]">ID & Judul Task</th>
                     <th className="p-4 whitespace-nowrap min-w-[130px]">Kategori</th>

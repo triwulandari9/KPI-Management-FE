@@ -161,8 +161,8 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-gray-800 text-sm">Total Point Sprint</h3>
-                <span className="text-[10px] bg-accent-light text-accent font-bold px-2 py-0.5 rounded-full">
-                  Agustus 2026
+                <span className="text-[10px] bg-accent-light text-accent font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                  {startDate} – {endDate}
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 mb-3">
