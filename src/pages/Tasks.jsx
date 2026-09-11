@@ -16,6 +16,8 @@ import {
   FaStar,
   FaEdit,
   FaLightbulb,
+  FaChevronDown,
+  FaInbox,
 } from "react-icons/fa";
 
 import Header from "../layouts/Header";
@@ -31,19 +33,19 @@ const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
 
 // Status alur kerja ala ClickUp
 const STATUSES = [
-  { id: "Backlog", label: "Backlog", color: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-gray-400" },
-  { id: "Ready", label: "Ready", color: "bg-blue-50 text-blue-600 border-blue-200", dot: "bg-blue-500" },
-  { id: "On Progress", label: "On Progress", color: "bg-amber-50 text-amber-600 border-amber-200", dot: "bg-amber-500" },
-  { id: "Code Review", label: "Code Review", color: "bg-purple-50 text-purple-600 border-purple-200", dot: "bg-purple-500" },
-  { id: "QA", label: "QA", color: "bg-indigo-50 text-indigo-600 border-indigo-200", dot: "bg-indigo-500" },
-  { id: "Done", label: "Done", color: "bg-green-50 text-green-600 border-green-200", dot: "bg-green-500" },
+  { id: "Backlog", label: "Backlog", color: "bg-slate-50 text-slate-700 border-slate-200", dot: "bg-slate-400", borderTop: "border-t-slate-400" },
+  { id: "Ready", label: "Ready", color: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", borderTop: "border-t-sky-500" },
+  { id: "On Progress", label: "On Progress", color: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", borderTop: "border-t-amber-500" },
+  { id: "Code Review", label: "Code Review", color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500", borderTop: "border-t-purple-500" },
+  { id: "QA", label: "QA Review", color: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-500", borderTop: "border-t-indigo-500" },
+  { id: "Done", label: "Done", color: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", borderTop: "border-t-emerald-500" },
 ];
 
 const CATEGORY_BADGES = {
-  Feature: { label: "Feature", bg: "bg-blue-50 text-blue-600 border-blue-200", icon: <FaCode size={11} /> },
-  "Bug Ticket": { label: "Ticket Bug (CH)", bg: "bg-red-50 text-red-600 border-red-200", icon: <FaBug size={11} /> },
-  "Tech Debt": { label: "Tech Debt", bg: "bg-orange-50 text-orange-600 border-orange-200", icon: <FaTools size={11} /> },
-  Improvement: { label: "Improvement", bg: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: <FaTools size={11} /> },
+  Feature: { label: "Feature", bg: "bg-blue-50 text-blue-700 border-blue-200/80", icon: <FaCode size={11} /> },
+  "Bug Ticket": { label: "Bug Ticket", bg: "bg-rose-50 text-rose-700 border-rose-200/80", icon: <FaBug size={11} /> },
+  "Tech Debt": { label: "Tech Debt", bg: "bg-orange-50 text-orange-700 border-orange-200/80", icon: <FaTools size={11} /> },
+  Improvement: { label: "Improvement", bg: "bg-emerald-50 text-emerald-700 border-emerald-200/80", icon: <FaLightbulb size={11} /> },
 };
 
 export default function Tasks() {
@@ -223,6 +225,37 @@ export default function Tasks() {
     }
   };
 
+  const handleOpenPointModal = (task) => {
+    setSelectedTaskForPoint(task);
+    setInputPoint(task.point ?? 5);
+  };
+
+  const formatTaskId = (id) => {
+    if (!id) return "#TASK";
+    const str = String(id);
+    if (str.length > 6) {
+      return `#${str.slice(-4).toUpperCase()}`;
+    }
+    return `#${str.toUpperCase()}`;
+  };
+
+  const getAssigneeInfo = (assigneeName) => {
+    const formatted = formatName(assigneeName) || "Unassigned";
+    const matchedEmp = employees.find(
+      (e) =>
+        formatName(e.name || e.username).toLowerCase() === formatted.toLowerCase() ||
+        (e.name && e.name.toLowerCase().includes(formatted.toLowerCase())) ||
+        (e.username && e.username.toLowerCase().includes(formatted.toLowerCase()))
+    );
+    return {
+      name: formatted,
+      avatar:
+        matchedEmp?.avatar ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(formatted)}&background=0284c7&color=fff&bold=true&size=64`,
+      role: matchedEmp?.position || matchedEmp?.role || "Developer",
+    };
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <Header />
@@ -283,8 +316,8 @@ export default function Tasks() {
 
         {/* View Mode: KANBAN BOARD */}
         {viewMode === "kanban" && (
-          <div className="overflow-x-auto pb-6 -mx-3 px-3 sm:mx-0 sm:px-0">
-            <div className="flex xl:grid xl:grid-cols-6 gap-3.5 items-start">
+          <div className="overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+            <div className="flex gap-4 items-start min-w-max pb-2">
               {STATUSES.map((col) => {
                 const colTasks = filteredTasks.filter((t) => t.status === col.id);
                 const isOver = dragOverColumn === col.id;
@@ -296,125 +329,149 @@ export default function Tasks() {
                     onDragEnter={() => handleDragEnter(col.id)}
                     onDragLeave={() => handleDragLeave(col.id)}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className={`rounded-2xl p-3 border transition-all duration-200 flex flex-col min-h-[420px] sm:min-h-[520px] w-[280px] sm:w-[320px] xl:w-auto shrink-0 xl:shrink ${
+                    className={`rounded-2xl p-3.5 border transition-all duration-200 flex flex-col min-h-[460px] w-[285px] sm:w-[305px] shrink-0 border-t-4 ${col.borderTop || "border-t-primary"} ${
                       isOver
-                        ? "bg-primary-light/50 border-primary border-2 border-dashed shadow-md"
-                        : "bg-gray-100/70 border-gray-200/70"
+                        ? "bg-primary-light/40 border-primary border-dashed shadow-md"
+                        : "bg-slate-100/70 border-slate-200/80"
                     }`}
                   >
                     {/* Column Header */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-gray-200 mb-2.5 gap-2">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200/80">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.dot}`}></span>
-                        <h3 className="text-xs font-bold text-gray-800 whitespace-nowrap truncate">{col.label}</h3>
+                        <span className={`w-2.5 h-2.5 rounded-full ring-2 ring-white shrink-0 ${col.dot}`}></span>
+                        <h3 className="text-xs font-bold text-gray-800 whitespace-nowrap uppercase tracking-wider">{col.label}</h3>
                       </div>
-                      <span className="text-[11px] font-semibold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs shrink-0">
+                      <span className="text-[11px] font-bold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs shrink-0">
                         {colTasks.length}
                       </span>
                     </div>
 
                     {/* Task Cards Container */}
-                    <div className="flex flex-col gap-2.5 flex-1">
+                    <div className="flex flex-col gap-3 flex-1">
                       {colTasks.length === 0 ? (
-                        <div className="h-28 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs text-center p-3">
-                          {isOver ? "Lepaskan task di sini" : "Tidak ada task"}
+                        <div className="h-32 rounded-xl border-2 border-dashed border-gray-200/80 flex flex-col items-center justify-center gap-1.5 text-gray-400 text-xs text-center p-3 bg-white/40">
+                          <FaInbox className="text-gray-300" size={20} />
+                          <span className="text-[11px] font-medium">{isOver ? "Lepaskan task di sini" : "Tidak ada task"}</span>
                         </div>
                       ) : (
-                        colTasks.map((task) => (
-                          <div
-                            key={task.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, task.id)}
-                            className="bg-white rounded-xl p-3.5 border border-gray-200/80 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2 group relative"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] text-gray-400 font-mono truncate min-w-0">{task.id}</span>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
-                                  CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                                }`}
-                              >
-                                {task.category}
-                              </span>
-                            </div>
-
-                            <h4 className="text-xs font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug">
-                              {task.title}
-                            </h4>
-
-                            {task.description && (
-                              <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed">
-                                {task.description}
-                              </p>
-                            )}
-
-                            {/* Info Deadline & SP Point */}
-                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
-                              <span className="flex items-center gap-1 text-[10px]">
-                                <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline}
-                              </span>
-
-                              {/* Badge Poin (Bisa diklik khusus HR/PO untuk atur nilai poin) */}
-                              {isHR ? (
-                                <button
-                                  onClick={() => handleOpenPointModal(task)}
-                                  className="flex items-center gap-1 font-bold text-[10px] bg-accent-light text-accent hover:bg-accent hover:text-white px-2.5 py-0.5 rounded-full border border-accent/30 transition-all cursor-pointer whitespace-nowrap shrink-0"
-                                  title="Klik untuk ubah poin task (Mode HR/PO)"
-                                >
-                                  <FaStar size={9} /> {task.point ?? 0} SP
-                                </button>
-                              ) : (
-                                <span className="font-bold text-[10px] bg-accent-light text-accent px-2.5 py-0.5 rounded-full border border-accent/20 whitespace-nowrap shrink-0">
-                                  {task.point ?? 0} SP
+                        colTasks.map((task) => {
+                          const assigneeInfo = getAssigneeInfo(task.assignee);
+                          return (
+                            <div
+                              key={task.id}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, task.id)}
+                              className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2.5 group relative"
+                            >
+                              {/* Top Meta: ID & Kategori Badge */}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70">
+                                  {formatTaskId(task.id)}
                                 </span>
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${
+                                    CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                                  }`}
+                                >
+                                  {CATEGORY_BADGES[task.category]?.icon}
+                                  {CATEGORY_BADGES[task.category]?.label || task.category}
+                                </span>
+                              </div>
+
+                              {/* Judul & Deskripsi */}
+                              <div>
+                                <h4 className="text-[13px] font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug line-clamp-2">
+                                  {task.title}
+                                </h4>
+                                {task.description && (
+                                  <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mt-1">
+                                    {task.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Info Deadline & SP Point */}
+                              <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                                  <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline || "Tanpa deadline"}
+                                </span>
+
+                                {/* Badge Poin (Bisa diklik khusus HR/PO untuk atur nilai poin) */}
+                                {isHR ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenPointModal(task);
+                                    }}
+                                    className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200/80 transition-all cursor-pointer shadow-2xs"
+                                    title="Klik untuk ubah poin task (Mode HR/PO)"
+                                  >
+                                    <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-200/60 shadow-2xs">
+                                    <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Assignee Footer & Quick Status Picker */}
+                              <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100/80">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <img
+                                    src={assigneeInfo.avatar}
+                                    alt={assigneeInfo.name}
+                                    className="w-5.5 h-5.5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
+                                    onError={(e) => {
+                                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignee)}&background=0284c7&color=fff&bold=true&size=64`;
+                                    }}
+                                  />
+                                  <span className="text-[11px] font-semibold text-gray-700 truncate">
+                                    {assigneeInfo.name}
+                                  </span>
+                                </div>
+
+                                {/* Dropdown pemindah status cepat */}
+                                <div className="relative shrink-0">
+                                  <select
+                                    value={task.status}
+                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                    className="text-[10px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-2 pr-5 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors"
+                                  >
+                                    {STATUSES.map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <FaChevronDown
+                                    size={7}
+                                    className="text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Tombol Aksi Khusus jika berada di QA */}
+                              {task.status === "QA" && (
+                                <div className="pt-2 flex gap-1.5 border-t border-gray-100">
+                                  <button
+                                    onClick={() => handleRejectQA(task.id)}
+                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-2 rounded-xl border border-red-200/80 cursor-pointer shadow-2xs transition-colors"
+                                    title="Kembalikan task ke Developer karena ada temuan bug"
+                                  >
+                                    <FaExclamationTriangle size={9} /> Reject Bug
+                                  </button>
+                                  <button
+                                    onClick={() => handleStatusChange(task.id, "Done")}
+                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs transition-colors"
+                                  >
+                                    <FaCheckCircle size={10} /> Lolos Done
+                                  </button>
+                                </div>
                               )}
                             </div>
-
-                            {/* Assignee Footer & Quick Status Picker */}
-                            <div className="flex items-center justify-between pt-1">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px]">
-                                  {task.assignee.charAt(0)}
-                                </div>
-                                <span className="text-[11px] font-medium text-gray-600 truncate max-w-[80px]">
-                                  {task.assignee}
-                                </span>
-                              </div>
-
-                              {/* Dropdown pemindah status cepat */}
-                              <select
-                                value={task.status}
-                                onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                                className="text-[10px] font-semibold bg-gray-50 border border-gray-200 rounded-lg px-1.5 py-0.5 text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                              >
-                                {STATUSES.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {/* Tombol Aksi Khusus jika berada di QA */}
-                            {task.status === "QA" && (
-                              <div className="pt-1 flex gap-1.5 border-t border-gray-50">
-                                <button
-                                  onClick={() => handleRejectQA(task.id)}
-                                  className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-red-50 text-red-600 hover:bg-red-100 p-1 rounded-lg border border-red-200 cursor-pointer"
-                                  title="Kembalikan task ke Developer karena ada temuan bug"
-                                >
-                                  <FaExclamationTriangle size={9} /> Reject Bug
-                                </button>
-                                <button
-                                  onClick={() => handleStatusChange(task.id, "Done")}
-                                  className="flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold bg-green-50 text-green-600 hover:bg-green-100 p-1 rounded-lg border border-green-200 cursor-pointer"
-                                >
-                                  <FaCheckCircle size={9} /> Lolos Done
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -441,67 +498,90 @@ export default function Tasks() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {filteredTasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="p-4">
-                        <span className="text-[10px] text-gray-400 font-mono block">{task.id}</span>
-                        <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
-                        <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
-                            CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                          }`}
-                        >
-                          {CATEGORY_BADGES[task.category]?.icon}
-                          {task.category}
-                        </span>
-                      </td>
-                      <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{task.assignee}</td>
-                      <td className="p-4 whitespace-nowrap">
-                        <p className="font-medium text-gray-700">{task.deadline}</p>
-                        <span className="text-[10px] text-gray-400">SLA: {task.sla}</span>
-                      </td>
-                      <td className="p-4 text-center whitespace-nowrap">
-                        {isHR ? (
-                          <button
-                            onClick={() => handleOpenPointModal(task)}
-                            className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-accent-light text-accent hover:bg-accent hover:text-white px-3 py-1 rounded-full border border-accent/30 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
-                            title="Atur Poin Task"
-                          >
-                            <FaStar size={10} /> {task.point ?? 0} SP
-                          </button>
-                        ) : (
-                          <span className="inline-flex items-center justify-center font-bold text-xs bg-accent-light text-accent px-3 py-1 rounded-full border border-accent/20 whitespace-nowrap shadow-2xs">
-                            {task.point ?? 0} SP
+                  {filteredTasks.map((task) => {
+                    const assigneeInfo = getAssigneeInfo(task.assignee);
+                    return (
+                      <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="p-4">
+                          <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70 inline-block mb-1">
+                            {formatTaskId(task.id)}
                           </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
-                            STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
-                          }`}
-                        >
-                          {task.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center whitespace-nowrap">
-                        <select
-                          value={task.status}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                          className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs"
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                          <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
+                          <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
+                              CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                            }`}
+                          >
+                            {CATEGORY_BADGES[task.category]?.icon}
+                            {CATEGORY_BADGES[task.category]?.label || task.category}
+                          </span>
+                        </td>
+                        <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={assigneeInfo.avatar}
+                              alt={assigneeInfo.name}
+                              className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
+                              onError={(e) => {
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignee)}&background=0284c7&color=fff&bold=true&size=64`;
+                              }}
+                            />
+                            <span>{assigneeInfo.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 whitespace-nowrap">
+                          <p className="font-medium text-gray-700">{task.deadline || "-"}</p>
+                          <span className="text-[10px] text-gray-400">SLA: {task.sla || "48 Jam"}</span>
+                        </td>
+                        <td className="p-4 text-center whitespace-nowrap">
+                          {isHR ? (
+                            <button
+                              onClick={() => handleOpenPointModal(task)}
+                              className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-3 py-1 rounded-full border border-amber-200/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                              title="Atur Poin Task"
+                            >
+                              <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center justify-center font-bold text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200/60 whitespace-nowrap shadow-2xs">
+                              <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
+                              STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
+                            }`}
+                          >
+                            {task.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center whitespace-nowrap">
+                          <div className="relative inline-block">
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                              className="text-xs font-semibold bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl pl-2.5 pr-6 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs appearance-none transition-colors"
+                            >
+                              {STATUSES.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.label}
+                                </option>
+                              ))}
+                            </select>
+                            <FaChevronDown
+                              size={8}
+                              className="text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
