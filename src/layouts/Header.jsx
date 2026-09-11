@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { FaBars, FaCamera, FaTimes, FaTrashAlt, FaExclamationCircle } from "react-icons/fa";
+import { FaBars, FaCamera, FaTimes, FaTrashAlt, FaExclamationCircle, FaSpinner } from "react-icons/fa";
 import logo from "../assets/logo.png";
 import foto from "../assets/foto.jpg";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { employeeService } from "../services/employeeService";
+import { authService } from "../services/authService";
 
 export default function Header() {
   const { collapsed, setCollapsed, toggleMobile } = useSidebar();
@@ -114,36 +115,51 @@ export default function Header() {
     setPhotoError("");
 
     try {
-      // 1. Cari ID karyawan yang cocok di database
+      let savedSuccessfully = false;
       let targetEmpId = currentUser?._id || currentUser?.id;
+
+      // 1. Coba update via endpoint profil user terlebih dahulu (dapat diakses Karyawan & HR)
       try {
-        const allEmployees = await employeeService.getEmployees();
-        if (Array.isArray(allEmployees) && allEmployees.length > 0) {
-          const matched = allEmployees.find(
-            (emp) =>
-              (emp.email && currentUser?.email && emp.email.toLowerCase() === currentUser.email.toLowerCase()) ||
-              (emp.name && currentUser?.name && emp.name.toLowerCase() === currentUser.name.toLowerCase()) ||
-              (emp._id && emp._id === targetEmpId) ||
-              (emp.id && emp.id === targetEmpId)
-          );
-          if (matched) {
-            targetEmpId = matched._id || matched.id;
-          }
-        }
-      } catch (findErr) {
-        console.warn("Gagal lookup employee ID:", findErr);
+        await authService.updateProfile({ avatar: newAvatarPreview });
+        savedSuccessfully = true;
+      } catch (authErr) {
+        console.warn("Update via authService.updateProfile gagal/belum tersedia:", authErr.message);
       }
 
-      // 2. Simpan ke backend database
-      if (targetEmpId) {
-        await employeeService.updateEmployee(targetEmpId, { avatar: newAvatarPreview });
+      // 2. Coba update via employeeService.updateEmployee jika step 1 belum berhasil atau untuk sinkronisasi Employee
+      try {
+        let matchedEmpId = targetEmpId;
+        try {
+          const allEmployees = await employeeService.getEmployees();
+          if (Array.isArray(allEmployees) && allEmployees.length > 0) {
+            const matched = allEmployees.find(
+              (emp) =>
+                (emp.email && currentUser?.email && emp.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+                (emp.name && currentUser?.name && emp.name.toLowerCase() === currentUser.name.toLowerCase()) ||
+                (emp._id && (emp._id === targetEmpId || emp._id === currentUser?.id)) ||
+                (emp.id && (emp.id === targetEmpId || emp.id === currentUser?.id))
+            );
+            if (matched) {
+              matchedEmpId = matched._id || matched.id;
+              targetEmpId = matchedEmpId;
+            }
+          }
+        } catch (findErr) {
+          // Employee lookup might fail for non-HR roles
+        }
+
+        if (matchedEmpId) {
+          await employeeService.updateEmployee(matchedEmpId, { avatar: newAvatarPreview });
+          savedSuccessfully = true;
+        }
+      } catch (empErr) {
+        console.warn("Update via employeeService.updateEmployee gagal:", empErr.message);
       }
 
       // 3. Update profile di state lokal & localStorage
       updateUserProfile({ avatar: newAvatarPreview });
 
-      // 4. Notifikasi agar komponen seperti Employees.jsx langsung memperbarui tampilan kartu
-      // Update other tabs via localStorage
+      // 4. Notifikasi agar komponen lain langsung memperbarui tampilan kartu
       try {
         localStorage.setItem(
           "kpi_avatar_updated",
@@ -152,19 +168,23 @@ export default function Header() {
       } catch (e) {
         console.warn("Failed to write avatar update to localStorage", e);
       }
-      // Emit event for current tab components
+
       window.dispatchEvent(
         new CustomEvent("user_avatar_updated", {
           detail: { avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId },
         })
       );
 
+      if (!savedSuccessfully) {
+        console.warn("Catatan: Foto tersimpan lokal, namun backend server belum menyediakan izin penyimpanan permanen.");
+      }
+
       setIsPhotoModalOpen(false);
     } catch (err) {
       console.error("Gagal simpan avatar ke server database:", err);
-      // Tetap update lokal jika ada kendala koneksi
-      updateUserProfile({ avatar: newAvatarPreview });
-      setIsPhotoModalOpen(false);
+      setPhotoError(
+        err.message || "Gagal menyimpan foto profil ke server database. Silakan coba lagi."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -292,16 +312,24 @@ export default function Header() {
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsPhotoModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer"
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-70"
                 >
-                  Simpan Foto
+                  {isSaving ? (
+                    <>
+                      <FaSpinner className="animate-spin" size={12} /> Menyimpan...
+                    </>
+                  ) : (
+                    "Simpan Foto"
+                  )}
                 </button>
               </div>
             </form>

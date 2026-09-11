@@ -59,6 +59,24 @@ export const authService = {
     return this.getCurrentUser();
   },
 
+  async updateProfile(profileData) {
+    try {
+      const response = await apiClient.put("/auth/profile", profileData);
+      return response?.user || response?.data?.user || response?.data || response;
+    } catch (err) {
+      if (err.status === 404 || (err.message && err.message.includes("404"))) {
+        try {
+          const response = await apiClient.patch("/auth/me", profileData);
+          return response?.user || response?.data?.user || response?.data || response;
+        } catch {
+          const response = await apiClient.put("/users/profile", profileData);
+          return response?.user || response?.data?.user || response?.data || response;
+        }
+      }
+      throw err;
+    }
+  },
+
   logout() {
     localStorage.removeItem("kpi_token");
     localStorage.removeItem("kpi_user");

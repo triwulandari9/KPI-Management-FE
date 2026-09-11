@@ -36,16 +36,27 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => getValidSessionUser());
 
   const login = async (userData) => {
-    // If avatar is missing, try to fetch it from employee record first
+    // If avatar is missing, try to fetch it from backend user profile or employee record
     let finalUser = { ...userData };
     if (!finalUser?.avatar) {
       try {
-        const emp = await employeeService.getEmployeeById(finalUser._id || finalUser.id);
-        if (emp?.avatar) {
-          finalUser.avatar = emp.avatar;
+        const me = await authService.getCurrentUser();
+        if (me?.avatar) {
+          finalUser.avatar = me.avatar;
         }
-      } catch (e) {
-        console.warn("Failed to sync avatar after login", e);
+      } catch {
+        // Fallback to employee record if getCurrentUser failed
+      }
+
+      if (!finalUser?.avatar) {
+        try {
+          const emp = await employeeService.getEmployeeById(finalUser._id || finalUser.id);
+          if (emp?.avatar) {
+            finalUser.avatar = emp.avatar;
+          }
+        } catch (e) {
+          console.warn("Failed to sync avatar after login", e);
+        }
       }
     }
     const expiryTime = Date.now() + SESSION_DURATION;
@@ -75,7 +86,7 @@ export function AuthProvider({ children }) {
               })
             );
           }
-        } catch {}
+        } catch { }
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -103,15 +114,31 @@ export function AuthProvider({ children }) {
         try {
           const parsed = JSON.parse(storedUser);
           if (!parsed?.avatar) {
-            const emp = await employeeService.getEmployeeById(parsed._id || parsed.id);
-            if (emp?.avatar) {
-              const updated = { ...parsed, avatar: emp.avatar };
+            let foundAvatar = "";
+            try {
+              const me = await authService.getCurrentUser();
+              if (me?.avatar) {
+                foundAvatar = me.avatar;
+              }
+            } catch {}
+
+            if (!foundAvatar) {
+              try {
+                const emp = await employeeService.getEmployeeById(parsed._id || parsed.id);
+                if (emp?.avatar) {
+                  foundAvatar = emp.avatar;
+                }
+              } catch {}
+            }
+
+            if (foundAvatar) {
+              const updated = { ...parsed, avatar: foundAvatar };
               setCurrentUser(updated);
               localStorage.setItem("kpi_user", JSON.stringify(updated));
               // Broadcast avatar change for other components/tabs
               window.dispatchEvent(
                 new CustomEvent("user_avatar_updated", {
-                  detail: { avatar: emp.avatar, email: updated.email, id: updated._id || updated.id },
+                  detail: { avatar: foundAvatar, email: updated.email, id: updated._id || updated.id },
                 })
               );
             }
