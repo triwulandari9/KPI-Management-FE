@@ -36,31 +36,27 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => getValidSessionUser());
 
   const login = async (userData) => {
-    const expiryTime = Date.now() + SESSION_DURATION;
-    // Store basic user info first
-    setCurrentUser(userData);
-    localStorage.setItem("kpi_user", JSON.stringify(userData));
-    localStorage.setItem("kpi_session_expiry", expiryTime.toString());
-
-    // If avatar not present, fetch it from employee record (in case backend login response lacks avatar)
-    if (!userData?.avatar) {
+    // If avatar is missing, try to fetch it from employee record first
+    let finalUser = { ...userData };
+    if (!finalUser?.avatar) {
       try {
-        const emp = await employeeService.getEmployeeById(userData._id || userData.id);
+        const emp = await employeeService.getEmployeeById(finalUser._id || finalUser.id);
         if (emp?.avatar) {
-          userData = { ...userData, avatar: emp.avatar };
-          setCurrentUser(userData);
-          localStorage.setItem("kpi_user", JSON.stringify(userData));
+          finalUser.avatar = emp.avatar;
         }
       } catch (e) {
         console.warn("Failed to sync avatar after login", e);
       }
     }
-
-    // Dispatch global avatar update event if avatar provided (now guaranteed if we fetched it)
-    if (userData?.avatar) {
+    const expiryTime = Date.now() + SESSION_DURATION;
+    setCurrentUser(finalUser);
+    localStorage.setItem("kpi_user", JSON.stringify(finalUser));
+    localStorage.setItem("kpi_session_expiry", expiryTime.toString());
+    // Dispatch global avatar update event if avatar is now present
+    if (finalUser?.avatar) {
       window.dispatchEvent(
         new CustomEvent("user_avatar_updated", {
-          detail: { avatar: userData.avatar, email: userData.email, id: userData._id || userData.id },
+          detail: { avatar: finalUser.avatar, email: finalUser.email, id: finalUser._id || finalUser.id },
         })
       );
     }
