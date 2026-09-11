@@ -127,25 +127,37 @@ export default function Employees() {
     };
   }, [currentUser]);
 
-  // Polling to keep employee data (including avatars) up to date globally
+  // Cross‑tab avatar sync via localStorage
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === "kpi_avatar_updated" && e.newValue) {
+        // Refresh employee list to get updated avatar URLs
+        (async () => {
+          try {
+            const data = await employeeService.getEmployees();
+            setEmployees(data);
+          } catch (err) {
+            console.error("Failed to refresh employees after avatar update:", err);
+          }
+        })();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+// Polling to refresh employee data globally every 30 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const freshData = await employeeService.getEmployees();
-        if (Array.isArray(freshData) && freshData.length > 0) {
-          setEmployees((prev) => {
-            // Only update if there is a change in avatar URLs
-            const hasChange = freshData.some((emp, idx) => {
-              const prevEmp = prev[idx];
-              return prevEmp && emp.avatar !== prevEmp.avatar;
-            });
-            return hasChange ? freshData : prev;
-          });
+        if (Array.isArray(freshData) && freshData.length) {
+          setEmployees(freshData);
         }
       } catch (err) {
         console.error("Polling error fetching employees:", err);
       }
-    }, 30000); // 30 seconds
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

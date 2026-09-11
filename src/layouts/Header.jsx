@@ -143,6 +143,16 @@ export default function Header() {
       updateUserProfile({ avatar: newAvatarPreview });
 
       // 4. Notifikasi agar komponen seperti Employees.jsx langsung memperbarui tampilan kartu
+      // Update other tabs via localStorage
+      try {
+        localStorage.setItem(
+          "kpi_avatar_updated",
+          JSON.stringify({ avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId })
+        );
+      } catch (e) {
+        console.warn("Failed to write avatar update to localStorage", e);
+      }
+      // Emit event for current tab components
       window.dispatchEvent(
         new CustomEvent("user_avatar_updated", {
           detail: { avatar: newAvatarPreview, email: currentUser?.email, id: targetEmpId },

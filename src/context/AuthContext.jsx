@@ -115,6 +115,12 @@ export function AuthProvider({ children }) {
           })
         );
       }
+      // Dispatch generic user update event for other fields
+      window.dispatchEvent(
+        new CustomEvent("current_user_updated", {
+          detail: { user: nextUser },
+        })
+      );
       return nextUser;
     });
   };
