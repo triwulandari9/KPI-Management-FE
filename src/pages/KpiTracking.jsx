@@ -186,7 +186,7 @@ export default function KpiTracking() {
   // Load Real Employees from Backend
   const fetchEmployees = async () => {
     try {
-      const data = await employeeService.getEmployees();
+      const data = await employeeService.getEmployees({ _t: Date.now() });
       if (Array.isArray(data) && data.length > 0) {
         setEmployeesList(data);
         if (isHR) {

@@ -134,7 +134,7 @@ export default function Employees() {
         // Refresh employee list to get updated avatar URLs
         (async () => {
           try {
-            const data = await employeeService.getEmployees();
+            const data = await employeeService.getEmployees({ _t: Date.now() });
             setEmployees(data);
           } catch (err) {
             console.error("Failed to refresh employees after avatar update:", err);
@@ -150,14 +150,14 @@ export default function Employees() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const freshData = await employeeService.getEmployees();
+        const freshData = await employeeService.getEmployees({ _t: Date.now() });
         if (Array.isArray(freshData) && freshData.length) {
           setEmployees(freshData);
         }
       } catch (err) {
         console.error("Polling error fetching employees:", err);
       }
-    }, 30000);
+    }, 10000); // 10 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -339,7 +339,17 @@ export default function Employees() {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
       }
       if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
+        // Update global user profile (dispatches event)
         updateUserProfile?.({ avatar: editFormData.avatar });
+        // Also broadcast via localStorage for other tabs (employees list)
+        try {
+          localStorage.setItem(
+            "kpi_avatar_updated",
+            JSON.stringify({ avatar: editFormData.avatar, email: currentUser?.email, id: empId })
+          );
+        } catch (e) {
+          console.warn("Failed to write avatar update to localStorage", e);
+        }
       }
       setEditingEmployee(null);
       setAvatarError("");
@@ -357,7 +367,17 @@ export default function Employees() {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData }));
       }
       if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
+        // Update profile locally on error fallback
         updateUserProfile?.({ avatar: editFormData.avatar });
+        // Broadcast via localStorage for other tabs
+        try {
+          localStorage.setItem(
+            "kpi_avatar_updated",
+            JSON.stringify({ avatar: editFormData.avatar, email: currentUser?.email, id: empId })
+          );
+        } catch (e) {
+          console.warn("Failed to write avatar update to localStorage", e);
+        }
       }
       setEditingEmployee(null);
       setAvatarError("");
