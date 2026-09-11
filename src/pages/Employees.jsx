@@ -25,7 +25,7 @@ import { employeeService } from "../services/employeeService";
 
 export default function Employees() {
   const { collapsed } = useSidebar();
-  const { currentUser } = useAuth();
+  const { currentUser, updateUserProfile } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
   // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
@@ -51,6 +51,7 @@ export default function Employees() {
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [isPhotoOnlyMode, setIsPhotoOnlyMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [avatarError, setAvatarError] = useState("");
 
@@ -63,7 +64,7 @@ export default function Employees() {
     avatar: "",
   });
 
-  // State Form Edit Karyawan (Khusus HR)
+  // State Form Edit Karyawan
   const [editFormData, setEditFormData] = useState({
     name: "",
     role: "Frontend Developer",
@@ -174,8 +175,24 @@ export default function Employees() {
     }
   };
 
+  // Buka modal edit penuh (khusus HR)
   const handleOpenEditModal = (emp) => {
     setEditingEmployee(emp);
+    setIsPhotoOnlyMode(false);
+    setAvatarError("");
+    setEditFormData({
+      name: formatName(emp.name || ""),
+      role: emp.role || emp.position || "Frontend Developer",
+      department: emp.department || "Engineering",
+      email: emp.email || "",
+      avatar: emp.avatar || "",
+    });
+  };
+
+  // Buka modal edit foto saja (untuk Karyawan biasa yang ingin ganti fotonya sendiri)
+  const handleOpenPhotoOnlyModal = (emp) => {
+    setEditingEmployee(emp);
+    setIsPhotoOnlyMode(true);
     setAvatarError("");
     setEditFormData({
       name: formatName(emp.name || ""),
@@ -203,6 +220,9 @@ export default function Employees() {
       if (selectedEmployee && (selectedEmployee._id || selectedEmployee.id) === empId) {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
       }
+      if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
+        updateUserProfile?.({ avatar: editFormData.avatar });
+      }
       setEditingEmployee(null);
       setAvatarError("");
     } catch (err) {
@@ -217,6 +237,9 @@ export default function Employees() {
       );
       if (selectedEmployee && (selectedEmployee._id || selectedEmployee.id) === empId) {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData }));
+      }
+      if (currentUser && (currentUser.email === editingEmployee.email || currentUser._id === empId || currentUser.id === empId)) {
+        updateUserProfile?.({ avatar: editFormData.avatar });
       }
       setEditingEmployee(null);
       setAvatarError("");
@@ -345,7 +368,7 @@ export default function Employees() {
                 >
                   Lihat Detail KPI
                 </button>
-                {isHR && (
+                {isHR ? (
                   <button
                     onClick={() => handleOpenEditModal(emp)}
                     className="px-3.5 py-2 bg-gray-100 hover:bg-primary hover:text-white text-gray-700 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
@@ -353,6 +376,20 @@ export default function Employees() {
                   >
                     <FaEdit size={11} /> Edit
                   </button>
+                ) : (
+                  currentUser &&
+                  (currentUser.email === emp.email ||
+                    currentUser._id === emp._id ||
+                    currentUser.id === emp.id ||
+                    currentUser.name?.toLowerCase() === emp.name?.toLowerCase()) && (
+                    <button
+                      onClick={() => handleOpenPhotoOnlyModal(emp)}
+                      className="px-3 py-2 bg-blue-50 hover:bg-primary hover:text-white text-primary text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                      title="Ganti foto profil saya"
+                    >
+                      <FaCamera size={11} /> Ganti Foto
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -437,7 +474,24 @@ export default function Employees() {
                   >
                     <FaEdit size={11} /> Ubah Role & Divisi
                   </button>
-                ) : <div />}
+                ) : currentUser &&
+                  (currentUser.email === selectedEmployee.email ||
+                    currentUser._id === selectedEmployee._id ||
+                    currentUser.id === selectedEmployee.id ||
+                    currentUser.name?.toLowerCase() === selectedEmployee.name?.toLowerCase()) ? (
+                  <button
+                    onClick={() => {
+                      const empToEdit = selectedEmployee;
+                      setSelectedEmployee(null);
+                      handleOpenPhotoOnlyModal(empToEdit);
+                    }}
+                    className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <FaCamera size={11} /> Ganti Foto Saya
+                  </button>
+                ) : (
+                  <div />
+                )}
                 <button
                   onClick={() => setSelectedEmployee(null)}
                   className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl cursor-pointer"
@@ -599,18 +653,24 @@ export default function Employees() {
           </div>
         )}
 
-        {/* MODAL 3: Edit Role & Divisi Karyawan (Khusus HR) */}
+        {/* MODAL 3: Edit Profil & Role Karyawan (HR: Semua Field | Karyawan: Foto Saja) */}
         {editingEmployee && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-primary-light text-primary flex items-center justify-center">
-                    <FaEdit size={16} />
+                    {isPhotoOnlyMode ? <FaCamera size={16} /> : <FaEdit size={16} />}
                   </div>
                   <div>
-                    <h3 className="font-bold text-base sm:text-lg text-gray-800">Edit Profil & Role</h3>
-                    <p className="text-xs text-gray-400">Ubah posisi kerja dan divisi karyawan</p>
+                    <h3 className="font-bold text-base sm:text-lg text-gray-800">
+                      {isPhotoOnlyMode ? "Ubah Foto Profil Saya" : "Edit Profil & Role"}
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      {isPhotoOnlyMode
+                        ? "Upload foto profil baru Anda (.jpg, .jpeg, .png)"
+                        : "Ubah posisi kerja dan divisi karyawan"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -625,9 +685,9 @@ export default function Employees() {
               </div>
 
               <form onSubmit={handleUpdateEmployee} className="mt-4 flex flex-col gap-3.5 text-xs">
-                {/* Upload Foto Profil di Form Edit */}
+                {/* Upload Foto Profil */}
                 <div className="flex flex-col gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
-                  <label className="font-semibold text-gray-700">Foto Profil Karyawan</label>
+                  <label className="font-semibold text-gray-700">Foto Profil</label>
                   <div className="flex items-center gap-3.5">
                     <img
                       src={
@@ -635,12 +695,12 @@ export default function Employees() {
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(editFormData.name || "User")}&background=3b82f6&color=fff&bold=true`
                       }
                       alt="Preview"
-                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
+                      className="w-14 h-14 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <label className="cursor-pointer bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-2xs">
-                          <FaCamera size={11} className="text-primary" /> Ubah Foto
+                          <FaCamera size={11} className="text-primary" /> Pilih Foto Baru
                           <input
                             type="file"
                             accept=".jpg,.jpeg,.png,image/jpeg,image/png"
@@ -670,65 +730,89 @@ export default function Employees() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">
-                    Nama Lengkap <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
-                  />
-                </div>
+                {/* Jika Mode Karyawan (Foto Saja): Tampilkan info read-only */}
+                {isPhotoOnlyMode ? (
+                  <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-400">Nama:</span>
+                      <span className="font-bold text-gray-800">{editFormData.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-400">Email:</span>
+                      <span className="font-semibold text-gray-700">{editFormData.email}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-400">Jabatan & Divisi:</span>
+                      <span className="font-semibold text-primary">{editFormData.role} • {editFormData.department}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 italic pt-1 border-t border-gray-200/60 mt-1">
+                      *Perubahan nama, jabatan, dan divisi hanya dapat dilakukan oleh HR.
+                    </p>
+                  </div>
+                ) : (
+                  /* Jika Mode HR: Semua field dapat diedit */
+                  <>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">
+                        Nama Lengkap <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editFormData.name}
+                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">
-                    Email Resmi <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={editFormData.email}
-                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
-                  />
-                </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">
+                        Email Resmi <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={editFormData.email}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Posisi / Role Kerja</label>
-                  <select
-                    value={editFormData.role}
-                    onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
-                  >
-                    <option value="Frontend Developer">Frontend Developer</option>
-                    <option value="Backend Developer">Backend Developer</option>
-                    <option value="UI/UX Designer">UI/UX Designer</option>
-                    <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
-                    <option value="Product Owner (PO)">Product Owner (PO)</option>
-                    <option value="DevOps Engineer">DevOps Engineer</option>
-                    <option value="Mobile Developer">Mobile Developer</option>
-                    <option value="Engineering Manager">Engineering Manager</option>
-                    <option value="HR / People Operations">HR / People Operations</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Posisi / Role Kerja</label>
+                      <select
+                        value={editFormData.role}
+                        onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                      >
+                        <option value="Frontend Developer">Frontend Developer</option>
+                        <option value="Backend Developer">Backend Developer</option>
+                        <option value="UI/UX Designer">UI/UX Designer</option>
+                        <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
+                        <option value="Product Owner (PO)">Product Owner (PO)</option>
+                        <option value="DevOps Engineer">DevOps Engineer</option>
+                        <option value="Mobile Developer">Mobile Developer</option>
+                        <option value="Engineering Manager">Engineering Manager</option>
+                        <option value="HR / People Operations">HR / People Operations</option>
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Divisi / Departemen</label>
-                  <select
-                    value={editFormData.department}
-                    onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Product & Design">Product & Design</option>
-                    <option value="Quality Control">Quality Control</option>
-                    <option value="Product Management">Product Management</option>
-                    <option value="Human Resources">Human Resources</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Divisi / Departemen</label>
+                      <select
+                        value={editFormData.department}
+                        onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                      >
+                        <option value="Engineering">Engineering</option>
+                        <option value="Product & Design">Product & Design</option>
+                        <option value="Quality Control">Quality Control</option>
+                        <option value="Product Management">Product Management</option>
+                        <option value="Human Resources">Human Resources</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
                   <button
@@ -745,7 +829,7 @@ export default function Employees() {
                     type="submit"
                     className="px-5 py-2 rounded-xl font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer"
                   >
-                    Simpan Perubahan
+                    {isPhotoOnlyMode ? "Simpan Foto Profil" : "Simpan Perubahan"}
                   </button>
                 </div>
               </form>

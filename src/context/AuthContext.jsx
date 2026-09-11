@@ -72,6 +72,14 @@ export function AuthProvider({ children }) {
     return Math.max(0, Number(expiry) - Date.now());
   };
 
+  const updateUserProfile = (updatedFields) => {
+    setCurrentUser((prev) => {
+      const nextUser = { ...(prev || {}), ...updatedFields };
+      localStorage.setItem("kpi_user", JSON.stringify(nextUser));
+      return nextUser;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -79,6 +87,7 @@ export function AuthProvider({ children }) {
         isAuthenticated: Boolean(currentUser),
         login,
         logout,
+        updateUserProfile,
         getRemainingSessionTime,
       }}
     >
