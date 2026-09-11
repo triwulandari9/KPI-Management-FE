@@ -357,6 +357,7 @@ export default function Tasks() {
         created || { ...taskPayload, id: `TASK-${Date.now().toString().slice(-4)}` },
         ...prev,
       ]);
+      await taskService.getAllTasks();
       setIsModalOpen(false);
       setNewTask({
         title: "",
@@ -411,10 +412,10 @@ export default function Tasks() {
         prev.map((t) =>
           t.id === taskId
             ? {
-                ...t,
-                status: "On Progress",
-                backwardCount: (t.backwardCount || 0) + 1,
-              }
+              ...t,
+              status: "On Progress",
+              backwardCount: (t.backwardCount || 0) + 1,
+            }
             : t
         )
       );
@@ -424,10 +425,10 @@ export default function Tasks() {
         prev.map((t) =>
           t.id === taskId
             ? {
-                ...t,
-                status: "On Progress",
-                backwardCount: (t.backwardCount || 0) + 1,
-              }
+              ...t,
+              status: "On Progress",
+              backwardCount: (t.backwardCount || 0) + 1,
+            }
             : t
         )
       );
@@ -549,17 +550,15 @@ export default function Tasks() {
           <div className="flex items-center bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode("kanban")}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                viewMode === "kanban" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${viewMode === "kanban" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               <FaThLarge size={12} /> Board Kanban
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                viewMode === "list" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${viewMode === "list" ? "bg-white text-primary shadow-xs" : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               <FaListUl size={12} /> List View
             </button>
@@ -581,11 +580,10 @@ export default function Tasks() {
                     onDragEnter={() => handleDragEnter(col.id)}
                     onDragLeave={() => handleDragLeave(col.id)}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className={`rounded-2xl p-3.5 border transition-all duration-200 flex flex-col min-h-[460px] w-[285px] sm:w-[305px] shrink-0 border-t-4 ${col.borderTop || "border-t-primary"} ${
-                      isOver
+                    className={`rounded-2xl p-3.5 border transition-all duration-200 flex flex-col min-h-[460px] w-[285px] sm:w-[305px] shrink-0 border-t-4 ${col.borderTop || "border-t-primary"} ${isOver
                         ? "bg-primary-light/40 border-primary border-dashed shadow-md"
                         : "bg-slate-100/70 border-slate-200/80"
-                    }`}
+                      }`}
                   >
                     {/* Column Header */}
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200/80">
@@ -625,9 +623,8 @@ export default function Tasks() {
                                   {formatTaskId(task.id)}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${
-                                    CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                                  }`}
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                                    }`}
                                 >
                                   {CATEGORY_BADGES[task.category]?.icon}
                                   {CATEGORY_BADGES[task.category]?.label || task.category}
@@ -788,9 +785,8 @@ export default function Tasks() {
                         </td>
                         <td className="p-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
-                              CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                            }`}
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                              }`}
                           >
                             {CATEGORY_BADGES[task.category]?.icon}
                             {CATEGORY_BADGES[task.category]?.label || task.category}
@@ -837,9 +833,8 @@ export default function Tasks() {
                         </td>
                         <td className="p-4 text-center whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
-                              STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
-                            }`}
+                            className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
+                              }`}
                           >
                             {task.status}
                           </span>
@@ -1049,11 +1044,10 @@ export default function Tasks() {
                         key={sp}
                         type="button"
                         onClick={() => setInputPoint(sp)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                          inputPoint === sp
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${inputPoint === sp
                             ? "bg-accent text-white border-accent shadow-xs scale-105"
                             : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                        }`}
+                          }`}
                       >
                         {sp} SP
                       </button>
