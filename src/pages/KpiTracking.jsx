@@ -761,7 +761,7 @@ export default function KpiTracking() {
 
                     {/* Category Badge */}
                     <td className="p-3 border-r border-gray-200">
-                      <span className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border ${kpi.categoryBg}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${kpi.categoryBg}`}>
                         {kpi.category}
                       </span>
                     </td>
@@ -897,7 +897,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">1. On Time Delivery</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: Naik 90% tepat waktu sesuai sprint</p>
                     </div>
@@ -936,7 +936,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">2. SLA Ticket Bug</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: 90% ticket diselesaikan tepat SLA</p>
                     </div>
@@ -975,7 +975,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">3. Production Bug Density</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: ≤ 5 Bug di environment production</p>
                     </div>
@@ -1001,7 +1001,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">4. Continuous Improvement</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 5%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: 3 Item inovasi / optimasi per bulan</p>
                     </div>
@@ -1066,7 +1066,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">6. Task Completion Rate</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: &lt; 48 Jam rata-rata pengerjaan task</p>
                     </div>
@@ -1092,7 +1092,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">7. Task Backward Rate</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: &lt; 20% task yang mental / ditolak QA</p>
                     </div>
@@ -1131,7 +1131,7 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">8. Sprint Point (SP)</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-bold">Bobot 15%</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
                       <p className="text-[11px] text-gray-500 mt-1">Target: 88 SP tercapai per bulan</p>
                     </div>

@@ -308,11 +308,11 @@ export default function CalendarPage() {
               <table className="w-full text-left text-xs min-w-[640px]">
                 <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
                   <tr>
-                    <th className="p-4">Tanggal</th>
-                    <th className="p-4">Nama Agenda / Deadline</th>
-                    <th className="p-4">Tim & Assignee</th>
-                    <th className="p-4">Kategori</th>
-                    <th className="p-4">Status</th>
+                    <th className="p-4 whitespace-nowrap">Tanggal</th>
+                    <th className="p-4 whitespace-nowrap">Nama Agenda / Deadline</th>
+                    <th className="p-4 whitespace-nowrap">Tim & Assignee</th>
+                    <th className="p-4 whitespace-nowrap">Kategori</th>
+                    <th className="p-4 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -322,20 +322,24 @@ export default function CalendarPage() {
                       onClick={() => setSelectedEvent(evt)}
                       className="hover:bg-gray-50/70 transition-colors cursor-pointer"
                     >
-                      <td className="p-4 font-bold text-gray-800">
+                      <td className="p-4 font-bold text-gray-800 whitespace-nowrap">
                         {evt.day} {MONTH_NAMES[evt.month]} {evt.year}
                       </td>
                       <td className="p-4 font-semibold text-gray-900">{evt.title}</td>
-                      <td className="p-4 text-gray-600 flex items-center gap-1.5">
-                        <FaUserCircle className="text-primary" /> {evt.assignee} ({evt.team})
+                      <td className="p-4 text-gray-600 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <FaUserCircle className="text-primary shrink-0" /> {evt.assignee} ({evt.team})
+                        </span>
                       </td>
-                      <td className="p-4">
-                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[11px] font-medium">
+                      <td className="p-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${evt.color || "bg-gray-100 text-gray-700 border-gray-200"}`}>
                           {evt.category}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <span className="font-semibold text-primary">{evt.status}</span>
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="inline-flex items-center text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-primary-light text-primary border-primary/20 whitespace-nowrap">
+                          {evt.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -420,7 +424,7 @@ export default function CalendarPage() {
         {/* MODAL: Detail Event / Deadline */}
         {selectedEvent && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <span className="text-[11px] font-bold text-accent bg-accent-light px-2.5 py-0.5 rounded-full">
                   {selectedEvent.category}
