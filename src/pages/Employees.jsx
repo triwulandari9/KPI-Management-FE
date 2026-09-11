@@ -127,6 +127,28 @@ export default function Employees() {
     };
   }, [currentUser]);
 
+  // Polling to keep employee data (including avatars) up to date globally
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const freshData = await employeeService.getEmployees();
+        if (Array.isArray(freshData) && freshData.length > 0) {
+          setEmployees((prev) => {
+            // Only update if there is a change in avatar URLs
+            const hasChange = freshData.some((emp, idx) => {
+              const prevEmp = prev[idx];
+              return prevEmp && emp.avatar !== prevEmp.avatar;
+            });
+            return hasChange ? freshData : prev;
+          });
+        }
+      } catch (err) {
+        console.error("Polling error fetching employees:", err);
+      }
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   const filteredEmployees = employees.filter((emp) => {
     return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;
   });

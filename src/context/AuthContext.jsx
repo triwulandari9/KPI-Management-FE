@@ -38,13 +38,36 @@ export function AuthProvider({ children }) {
     setCurrentUser(userData);
     localStorage.setItem("kpi_user", JSON.stringify(userData));
     localStorage.setItem("kpi_session_expiry", expiryTime.toString());
+    // Dispatch global avatar update event if avatar provided on login
+    if (userData?.avatar) {
+      window.dispatchEvent(
+        new CustomEvent("user_avatar_updated", {
+          detail: { avatar: userData.avatar, email: userData.email, id: userData._id || userData.id },
+        })
+      );
+    }
   };
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("kpi_user");
-    localStorage.removeItem("kpi_session_expiry");
-    localStorage.removeItem("kpi_token");
-    setCurrentUser(null);
+  // Broadcast avatar changes across tabs/windows
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === "kpi_user" && e.newValue) {
+        try {
+          const user = JSON.parse(e.newValue);
+          if (user?.avatar) {
+            window.dispatchEvent(
+              new CustomEvent("user_avatar_updated", {
+                detail: { avatar: user.avatar, email: user.email, id: user._id || user.id },
+              })
+            );
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,6 +99,14 @@ export function AuthProvider({ children }) {
     setCurrentUser((prev) => {
       const nextUser = { ...(prev || {}), ...updatedFields };
       localStorage.setItem("kpi_user", JSON.stringify(nextUser));
+      // Dispatch global avatar update event if avatar changed
+      if (nextUser?.avatar) {
+        window.dispatchEvent(
+          new CustomEvent("user_avatar_updated", {
+            detail: { avatar: nextUser.avatar, email: nextUser.email, id: nextUser._id || nextUser.id },
+          })
+        );
+      }
       return nextUser;
     });
   };
