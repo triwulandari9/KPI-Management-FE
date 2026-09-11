@@ -79,17 +79,53 @@ export default function Employees() {
       try {
         const data = await employeeService.getEmployees();
         if (isMounted && data) {
-          setEmployees(data);
+          // Sinkronkan foto jika currentUser punya avatar terbaru
+          const syncedData = data.map((emp) => {
+            const isMatch =
+              currentUser &&
+              (currentUser.email === emp.email ||
+                currentUser._id === (emp._id || emp.id) ||
+                currentUser.id === (emp._id || emp.id) ||
+                currentUser.name?.toLowerCase() === emp.name?.toLowerCase());
+            if (isMatch && currentUser.avatar) {
+              return { ...emp, avatar: currentUser.avatar };
+            }
+            return emp;
+          });
+          setEmployees(syncedData);
         }
       } catch (err) {
         console.error("Gagal load data employees:", err);
       }
     }
     loadEmployees();
+
+    const handleAvatarUpdated = (event) => {
+      const { avatar, email, id } = event.detail || {};
+      if (avatar) {
+        setEmployees((prev) =>
+          prev.map((emp) => {
+            const isMatch =
+              (email && emp.email === email) ||
+              (id && (emp._id === id || emp.id === id)) ||
+              (currentUser &&
+                (currentUser.email === emp.email ||
+                  currentUser._id === (emp._id || emp.id) ||
+                  currentUser.id === (emp._id || emp.id) ||
+                  currentUser.name?.toLowerCase() === emp.name?.toLowerCase()));
+            return isMatch ? { ...emp, avatar } : emp;
+          })
+        );
+      }
+    };
+
+    window.addEventListener("user_avatar_updated", handleAvatarUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("user_avatar_updated", handleAvatarUpdated);
     };
-  }, []);
+  }, [currentUser]);
 
   const filteredEmployees = employees.filter((emp) => {
     return selectedRole === "All" || emp.role?.includes(selectedRole) || emp.department === selectedRole;

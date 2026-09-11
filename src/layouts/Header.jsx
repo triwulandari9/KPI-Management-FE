@@ -4,6 +4,7 @@ import logo from "../assets/logo.png";
 import foto from "../assets/foto.jpg";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
+import { employeeService } from "../services/employeeService";
 
 export default function Header() {
   const { collapsed, setCollapsed, toggleMobile } = useSidebar();
@@ -61,9 +62,27 @@ export default function Header() {
     reader.readAsDataURL(file);
   };
 
-  const handleSavePhoto = (e) => {
+  const handleSavePhoto = async (e) => {
     e.preventDefault();
     updateUserProfile({ avatar: newAvatarPreview });
+
+    // Update avatar ke backend database
+    const empId = currentUser?._id || currentUser?.id;
+    if (empId) {
+      try {
+        await employeeService.updateEmployee(empId, { avatar: newAvatarPreview });
+      } catch (err) {
+        console.warn("Gagal update avatar ke server database:", err);
+      }
+    }
+
+    // Notifikasi agar komponen seperti Employees.jsx langsung memperbarui tampilan kartu
+    window.dispatchEvent(
+      new CustomEvent("user_avatar_updated", {
+        detail: { avatar: newAvatarPreview, email: currentUser?.email, id: empId },
+      })
+    );
+
     setIsPhotoModalOpen(false);
   };
 
