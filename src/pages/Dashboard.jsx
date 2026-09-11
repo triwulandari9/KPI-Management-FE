@@ -172,7 +172,7 @@ export default function Dashboard() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div className="flex-1">
@@ -181,7 +181,7 @@ export default function Dashboard() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -231,8 +231,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] text-gray-400 font-mono">{task.id}</span>
                       <h4 className="font-bold text-gray-800 text-xs sm:text-sm truncate max-w-[200px] sm:max-w-none">{task.title}</h4>
-                      <span className="text-[10px] font-bold bg-accent-light text-accent border border-accent/20 px-2 py-0.5 rounded-full shrink-0">
-                        {task.point} Point
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-accent-light text-accent border border-accent/20 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+                        {task.point ?? 0} Point
                       </span>
                     </div>
                     <p className="text-[11px] text-gray-400 mt-0.5">Assign: <span className="font-semibold text-gray-600">{task.assignee}</span></p>
@@ -253,7 +253,7 @@ export default function Dashboard() {
 
                   <div>
                     <p className="text-gray-400 text-[10px] font-medium mb-0.5">Status Tugas</p>
-                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-lg border ${STATUS_CONFIG[task.status]?.bg || "bg-gray-100 text-gray-700"}`}>
+                    <span className={`inline-flex items-center justify-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full border whitespace-nowrap shadow-2xs ${STATUS_CONFIG[task.status]?.bg || "bg-gray-100 text-gray-700 border-gray-200"}`}>
                       {task.status}
                     </span>
                   </div>

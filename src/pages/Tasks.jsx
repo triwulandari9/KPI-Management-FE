@@ -300,7 +300,7 @@ export default function Tasks() {
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] text-gray-400 font-mono">{task.id}</span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                                   CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                                 }`}
                               >
