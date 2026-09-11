@@ -203,7 +203,7 @@ export default function KpiTracking() {
     fetchEmployees();
   }, [isHR]);
 
-  // Listen for avatar updates to refresh employee data
+  // Listen for avatar updates to refresh employee data (custom event)
   useEffect(() => {
     const handler = () => {
       fetchEmployees();
@@ -212,6 +212,17 @@ export default function KpiTracking() {
     return () => {
       window.removeEventListener("user_avatar_updated", handler);
     };
+  }, []);
+
+  // Cross‑tab avatar sync via localStorage
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === "kpi_avatar_updated" && e.newValue) {
+        fetchEmployees();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const currentEmployee = isHR
