@@ -118,9 +118,17 @@ export default function Tasks() {
     };
   }, []);
 
-  const filteredTasks = tasks.filter((task) => {
-    return selectedCategory === "All" || task.category === selectedCategory;
-  });
+  const userCanSee = (task) => {
+    if (isHR) return true;
+    const isCreator = task.creator && task.creator === currentUser?.id;
+    const isAssignee = task.assignee && task.assignee === currentUser?.username;
+    return isCreator || isAssignee;
+  };
+
+  const filteredTasks = tasks
+    .filter(userCanSee)
+    .filter((task) => selectedCategory === "All" || task.category === selectedCategory);
+
 
   const handleSavePoint = async (e) => {
     e.preventDefault();
@@ -174,7 +182,7 @@ export default function Tasks() {
     if (!newTask.title.trim()) return;
 
     try {
-      const created = await taskService.createTask(newTask);
+      const created = await taskService.createTask({ ...newTask, creator: currentUser?.id });
       setTasks((prev) => [created, ...prev]);
       setIsModalOpen(false);
       const defaultAssignee = employees.length > 0
