@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import authService from "../services/authService";
 
 const AuthContext = createContext();
 
@@ -68,6 +69,13 @@ export function AuthProvider({ children }) {
     return () => {
       window.removeEventListener("storage", handleStorage);
     };
+  }, []);
+
+  // Define logout function
+  const logout = useCallback(() => {
+    // Clear auth data via service
+    authService.logout();
+    setCurrentUser(null);
   }, []);
 
   useEffect(() => {
