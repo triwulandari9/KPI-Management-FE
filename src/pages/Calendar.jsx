@@ -124,7 +124,7 @@ export default function CalendarPage() {
       <Header />
       <Sidebar />
 
-      <main className={`pt-16 p-4 sm:p-6 lg:px-8 lg:pb-4 flex-1 flex flex-col overflow-auto lg:overflow-hidden transition-all duration-300 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
+      <main className={`pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-4 flex-1 flex flex-col overflow-auto lg:overflow-hidden transition-all duration-300 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Header Kalender: Baris 1 = Judul, Baris 2 = Kontrol */}
         <div className="shrink-0 flex flex-col gap-3 mb-3 sm:mb-4">
           {/* Baris 1: Judul + Subtitle */}

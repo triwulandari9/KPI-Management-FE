@@ -516,7 +516,7 @@ export default function KpiTracking() {
       <Header />
       <Sidebar />
 
-      <main className={`transition-all duration-300 pt-16 p-4 sm:p-6 lg:p-8 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
+      <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader
           title="KPI Tracking & Performance Evaluation"
