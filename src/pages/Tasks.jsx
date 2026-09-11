@@ -328,14 +328,14 @@ export default function Tasks() {
                               {isHR ? (
                                 <button
                                   onClick={() => handleOpenPointModal(task)}
-                                  className="flex items-center gap-1 font-bold text-[10px] bg-accent-light text-accent hover:bg-accent hover:text-white px-2 py-0.5 rounded-full border border-accent/30 transition-all cursor-pointer"
+                                  className="flex items-center gap-1 font-bold text-[10px] bg-accent-light text-accent hover:bg-accent hover:text-white px-2.5 py-0.5 rounded-full border border-accent/30 transition-all cursor-pointer whitespace-nowrap shrink-0"
                                   title="Klik untuk ubah poin task (Mode HR/PO)"
                                 >
-                                  <FaStar size={9} /> {task.point} SP
+                                  <FaStar size={9} /> {task.point ?? 0} SP
                                 </button>
                               ) : (
-                                <span className="font-bold text-[10px] bg-accent-light text-accent px-2 py-0.5 rounded-full border border-accent/20">
-                                  {task.point} SP
+                                <span className="font-bold text-[10px] bg-accent-light text-accent px-2.5 py-0.5 rounded-full border border-accent/20 whitespace-nowrap shrink-0">
+                                  {task.point ?? 0} SP
                                 </span>
                               )}
                             </div>
@@ -398,16 +398,16 @@ export default function Tasks() {
         {viewMode === "list" && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[720px]">
-                <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
+              <table className="w-full text-left text-xs min-w-[920px]">
+                <thead className="bg-gray-50/90 border-b border-gray-100 text-gray-500 font-semibold">
                   <tr>
-                    <th className="p-4">ID & Judul Task</th>
-                    <th className="p-4">Kategori</th>
-                    <th className="p-4">Assignee</th>
-                    <th className="p-4">SLA / Deadline</th>
-                    <th className="p-4">Point (PO)</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-center">Aksi Status</th>
+                    <th className="p-4 min-w-[220px]">ID & Judul Task</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px]">Kategori</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px]">Assignee</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px]">SLA / Deadline</th>
+                    <th className="p-4 whitespace-nowrap min-w-[110px] text-center">Point (PO)</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px] text-center">Status</th>
+                    <th className="p-4 whitespace-nowrap min-w-[130px] text-center">Aksi Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -418,45 +418,46 @@ export default function Tasks() {
                         <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
                         <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 whitespace-nowrap">
                         <span
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
                             CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                           }`}
                         >
+                          {CATEGORY_BADGES[task.category]?.icon}
                           {task.category}
                         </span>
                       </td>
-                      <td className="p-4 font-semibold text-gray-800">{task.assignee}</td>
-                      <td className="p-4">
+                      <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{task.assignee}</td>
+                      <td className="p-4 whitespace-nowrap">
                         <p className="font-medium text-gray-700">{task.deadline}</p>
                         <span className="text-[10px] text-gray-400">SLA: {task.sla}</span>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 text-center whitespace-nowrap">
                         {isHR ? (
                           <button
                             onClick={() => handleOpenPointModal(task)}
-                            className="flex items-center gap-1 font-bold text-xs bg-accent-light text-accent hover:bg-accent hover:text-white px-3 py-1 rounded-full border border-accent/30 transition-all cursor-pointer"
+                            className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-accent-light text-accent hover:bg-accent hover:text-white px-3 py-1 rounded-full border border-accent/30 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
                             title="Atur Poin Task"
                           >
-                            <FaStar size={10} /> {task.point} SP
+                            <FaStar size={10} /> {task.point ?? 0} SP
                           </button>
                         ) : (
-                          <span className="font-bold text-xs bg-accent-light text-accent px-3 py-1 rounded-full border border-accent/20">
-                            {task.point} SP
+                          <span className="inline-flex items-center justify-center font-bold text-xs bg-accent-light text-accent px-3 py-1 rounded-full border border-accent/20 whitespace-nowrap shadow-2xs">
+                            {task.point ?? 0} SP
                           </span>
                         )}
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 text-center whitespace-nowrap">
                         <span
-                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${
-                            STATUSES.find((s) => s.id === task.status)?.bg || "bg-gray-100"
+                          className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${
+                            STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
                           }`}
                         >
                           {task.status}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center whitespace-nowrap">
                         <select
                           value={task.status}
                           onChange={(e) => handleStatusChange(task.id, e.target.value)}
