@@ -226,88 +226,37 @@ export default function Tasks() {
     .filter((task) => selectedCategory === "All" || task.category === selectedCategory);
 
   // -------------------------------------------------------------
-  // PILIHAN ASSIGNEE BERDASARKAN ROLE PENGGUNA
+  // PILIHAN ASSIGNEE: Mengambil semua data employee yang ada
   // -------------------------------------------------------------
-  // - PO: Dapat assign ke Diri Sendiri, Karyawan Lain, atau HR
-  // - Karyawan Biasa: Dapat assign ke Diri Sendiri atau HR
-  // - HR: Dapat assign ke Diri Sendiri atau HR
   const getAssigneeOptions = () => {
     const currentName = formatName(currentUser?.name || "Saya");
     const currentId = currentUser?._id || currentUser?.id;
 
-    if (isPO) {
-      if (employees && employees.length > 0) {
-        return employees.map((emp) => {
-          const formatted = formatName(emp.name || emp.username);
-          const roleName = emp.position || emp.role || "Karyawan";
-          const isMe =
-            (emp.email && emp.email === currentUser?.email) ||
-            (emp._id && (emp._id === currentId || emp._id === currentUser?.id)) ||
-            (emp.id && (emp.id === currentId || emp.id === currentUser?.id)) ||
-            formatted.toLowerCase() === currentName.toLowerCase();
-          return {
-            value: formatted,
-            label: isMe ? `${formatted} (Saya - PO)` : `${formatted} (${roleName})`,
-            empId: emp._id || emp.id,
-          };
-        });
-      }
-      return [
-        { value: currentName, label: `${currentName} (Saya - PO)`, empId: currentId },
-        { value: "Musa", label: "Musa (Backend Developer)", empId: "musa" },
-        { value: "Mitha", label: "Mitha (UI/UX Designer)", empId: "mitha" },
-        { value: "Admin HR", label: "Admin HR (HR)", empId: "hr" },
-      ];
+    if (employees && employees.length > 0) {
+      return employees.map((emp) => {
+        const formatted = formatName(emp.name || emp.username);
+        const roleName = emp.position || emp.role || "Karyawan";
+        const isMe =
+          (emp.email && emp.email === currentUser?.email) ||
+          (emp._id && (emp._id === currentId || emp._id === currentUser?.id)) ||
+          (emp.id && (emp.id === currentId || emp.id === currentUser?.id)) ||
+          formatted.toLowerCase() === currentName.toLowerCase();
+        return {
+          value: formatted,
+          label: isMe ? `${formatted} (Saya)` : `${formatted} (${roleName})`,
+          empId: emp._id || emp.id,
+        };
+      });
     }
 
-    if (isRegularEmployee) {
-      const options = [
-        {
-          value: currentName,
-          label: `${currentName} (Saya - Untuk Diri Sendiri)`,
-          empId: currentId,
-        },
-      ];
-
-      const hrEmployees = employees.filter(
-        (emp) =>
-          emp.role?.toUpperCase() === "HR" ||
-          emp.position?.toUpperCase() === "HR" ||
-          emp.department?.toUpperCase() === "HR" ||
-          emp.name?.toLowerCase().includes("hr")
-      );
-
-      if (hrEmployees.length > 0) {
-        hrEmployees.forEach((hr) => {
-          const formatted = formatName(hr.name || hr.username);
-          if (formatted.toLowerCase() !== currentName.toLowerCase()) {
-            options.push({
-              value: formatted,
-              label: `${formatted} (HR)`,
-              empId: hr._id || hr.id,
-            });
-          }
-        });
-      } else {
-        options.push({
-          value: "Admin HR",
-          label: "Admin HR (HR)",
-          empId: "hr-admin",
-        });
-      }
-
-      return options;
-    }
-
-    // Jika HR
-    const options = [
-      {
-        value: currentName,
-        label: `${currentName} (Saya - HR)`,
-        empId: currentId,
-      },
+    // Fallback jika data employees belum selesai dimuat dari backend
+    return [
+      { value: currentName, label: `${currentName} (Saya)`, empId: currentId },
+      { value: "Sari", label: "Sari (Frontend Developer)", empId: "sari" },
+      { value: "Musa", label: "Musa (Backend Developer)", empId: "musa" },
+      { value: "Mitha", label: "Mitha (UI/UX Designer)", empId: "mitha" },
+      { value: "Admin HR", label: "Admin HR (HR)", empId: "hr" },
     ];
-    return options;
   };
 
   const handleSavePoint = async (e) => {
@@ -901,13 +850,7 @@ export default function Tasks() {
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div>
                   <h3 className="font-bold text-lg text-gray-800">Tambah Task Baru</h3>
-                  <p className="text-xs text-gray-400">
-                    {isPO
-                      ? "Mode PO: Buat task untuk Diri Sendiri, Karyawan, atau HR"
-                      : isHR
-                      ? "Mode HR: Buat task untuk Diri Sendiri atau HR"
-                      : "Mode Karyawan: Buat task untuk Diri Sendiri atau berikan ke HR"}
-                  </p>
+                  <p className="text-xs text-gray-400">Pilih penerima tugas (assignee) dari daftar karyawan yang tersedia</p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
