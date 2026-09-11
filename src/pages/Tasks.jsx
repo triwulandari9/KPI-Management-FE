@@ -24,6 +24,7 @@ import PageHeader from "../layouts/PageHeader";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { taskService } from "../services/taskService";
+import { employeeService } from "../services/employeeService";
 
 // Nilai Poin Standar Sesuai Catatan Mentor / ClickUp
 const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
@@ -50,7 +51,18 @@ export default function Tasks() {
   const { currentUser } = useAuth();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
+  // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
+  const formatName = (name) => {
+    if (!name) return "";
+    return name
+      .toLowerCase()
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
+
   const [tasks, setTasks] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -73,17 +85,32 @@ export default function Tasks() {
 
   useEffect(() => {
     let isMounted = true;
-    async function loadTasks() {
+    async function loadData() {
       try {
-        const data = await taskService.getTasks();
-        if (isMounted && data) {
-          setTasks(data);
+        const [tasksData, employeesData] = await Promise.all([
+          taskService.getTasks().catch(() => []),
+          employeeService.getEmployees().catch(() => []),
+        ]);
+        if (isMounted) {
+          if (tasksData && Array.isArray(tasksData)) {
+            setTasks(tasksData);
+          }
+          if (employeesData && Array.isArray(employeesData) && employeesData.length > 0) {
+            setEmployees(employeesData);
+            const firstEmpName = formatName(employeesData[0]?.name || employeesData[0]?.username);
+            if (firstEmpName) {
+              setNewTask((prev) => ({
+                ...prev,
+                assignee: prev.assignee || firstEmpName,
+              }));
+            }
+          }
         }
       } catch (err) {
-        console.error("Gagal load data tasks:", err);
+        console.error("Gagal load data tasks & employees:", err);
       }
     }
-    loadTasks();
+    loadData();
     return () => {
       isMounted = false;
     };
@@ -148,11 +175,14 @@ export default function Tasks() {
       const created = await taskService.createTask(newTask);
       setTasks((prev) => [created, ...prev]);
       setIsModalOpen(false);
+      const defaultAssignee = employees.length > 0
+        ? formatName(employees[0].name || employees[0].username)
+        : "Sari";
       setNewTask({
         title: "",
         description: "",
         category: "Feature",
-        assignee: "Sari",
+        assignee: defaultAssignee,
         start: "",
         deadline: "",
         sla: "48 Jam",
@@ -540,15 +570,32 @@ export default function Tasks() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Assignee</label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Assignee <span className="text-red-500">*</span>
+                    </label>
                     <select
                       value={newTask.assignee}
                       onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer"
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                      required
                     >
-                      <option value="Sari">Sari (Frontend)</option>
-                      <option value="Musa">Musa (Backend)</option>
-                      <option value="Mitha">Mitha (UI/UX)</option>
+                      {employees && employees.length > 0 ? (
+                        employees.map((emp) => {
+                          const formatted = formatName(emp.name || emp.username);
+                          const roleName = emp.position || emp.role || "Developer";
+                          return (
+                            <option key={emp._id || emp.id} value={formatted}>
+                              {formatted} ({roleName})
+                            </option>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <option value="Sari">Sari (Frontend Developer)</option>
+                          <option value="Musa">Musa (Backend Developer)</option>
+                          <option value="Mitha">Mitha (UI/UX Designer)</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
