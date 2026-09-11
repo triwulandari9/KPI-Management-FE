@@ -34,6 +34,12 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
+  const formatAssignee = (val) => {
+    if (!val) return "Unassigned";
+    if (typeof val === "object") return val.name || val.username || val.email || "Unassigned";
+    return String(val);
+  };
+
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
@@ -286,7 +292,7 @@ export default function CalendarPage() {
                           key={evt.id}
                           onClick={() => setSelectedEvent(evt)}
                           className={`w-full text-left text-[9.5px] font-semibold px-1.5 py-0.5 rounded border transition-all truncate cursor-pointer leading-tight ${evt.color}`}
-                          title={`${evt.title} (${evt.assignee} - ${evt.status})`}
+                          title={`${evt.title} (${formatAssignee(evt.assignee)} - ${evt.status})`}
                         >
                           {evt.title}
                         </button>
@@ -327,7 +333,7 @@ export default function CalendarPage() {
                       <td className="p-4 font-semibold text-gray-900">{evt.title}</td>
                       <td className="p-4 text-gray-600 whitespace-nowrap">
                         <span className="flex items-center gap-1.5">
-                          <FaUserCircle className="text-primary shrink-0" /> {evt.assignee} ({evt.team})
+                          <FaUserCircle className="text-primary shrink-0" /> {formatAssignee(evt.assignee)} ({evt.team})
                         </span>
                       </td>
                       <td className="p-4 whitespace-nowrap">
@@ -445,7 +451,7 @@ export default function CalendarPage() {
                 <div className="space-y-2.5 text-xs">
                   <div className="flex justify-between p-2.5 bg-gray-50 rounded-xl">
                     <span className="text-gray-400">Penanggung Jawab</span>
-                    <span className="font-semibold text-gray-700">{selectedEvent.assignee}</span>
+                    <span className="font-semibold text-gray-700">{formatAssignee(selectedEvent.assignee)}</span>
                   </div>
                   <div className="flex justify-between p-2.5 bg-gray-50 rounded-xl">
                     <span className="text-gray-400">Divisi / Tim</span>

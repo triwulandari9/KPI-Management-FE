@@ -66,10 +66,19 @@ export default function Tasks() {
   const isRegularEmployee = !isPO && !isHR;
   const canSetPoint = isPO || isHR;
 
-  // Normalisasi nama dari backend (bisa ALL CAPS) menjadi Title Case
-  const formatName = (name) => {
-    if (!name) return "";
-    return name
+  // Normalisasi nama dari backend (bisa ALL CAPS atau object) menjadi Title Case yang aman
+  const formatName = (input) => {
+    if (!input) return "";
+    let str = "";
+    if (typeof input === "string") {
+      str = input;
+    } else if (typeof input === "object") {
+      str = input.name || input.username || input.email || "";
+    } else {
+      str = String(input);
+    }
+    if (!str || typeof str !== "string") return "";
+    return str
       .toLowerCase()
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -146,9 +155,9 @@ export default function Tasks() {
   const isTaskCreator = (task) => {
     if (!task || !currentUser) return false;
     const cId = currentUser._id || currentUser.id;
-    const cEmail = currentUser.email?.toLowerCase();
-    const cName = currentUser.name?.toLowerCase();
-    const cUsername = currentUser.username?.toLowerCase();
+    const cEmail = (currentUser.email || "").toLowerCase();
+    const cName = (currentUser.name || "").toLowerCase();
+    const cUsername = (currentUser.username || "").toLowerCase();
 
     const assignedBy =
       task.assignedBy ||
@@ -162,12 +171,13 @@ export default function Tasks() {
 
     if (typeof assignedBy === "object") {
       const creatorId = assignedBy._id || assignedBy.id;
-      const creatorEmail = assignedBy.email?.toLowerCase();
-      const creatorName = (assignedBy.name || assignedBy.username)?.toLowerCase();
+      const creatorEmail = (assignedBy.email || "").toLowerCase();
+      const creatorName = (assignedBy.name || assignedBy.username || "").toLowerCase();
       return (
         (cId && creatorId && String(cId) === String(creatorId)) ||
         (cEmail && creatorEmail && cEmail === creatorEmail) ||
-        (cName && creatorName && cName === creatorName)
+        (cName && creatorName && (cName === creatorName || cName.includes(creatorName) || creatorName.includes(cName))) ||
+        (cUsername && creatorName && cUsername === creatorName)
       );
     }
 
@@ -175,7 +185,7 @@ export default function Tasks() {
     return (
       (cId && String(cId).toLowerCase() === assignedByStr) ||
       (cEmail && cEmail === assignedByStr) ||
-      (cName && cName === assignedByStr) ||
+      (cName && (cName === assignedByStr || cName.includes(assignedByStr) || assignedByStr.includes(cName))) ||
       (cUsername && cUsername === assignedByStr)
     );
   };
@@ -183,9 +193,9 @@ export default function Tasks() {
   const isTaskAssignee = (task) => {
     if (!task || !currentUser) return false;
     const cId = currentUser._id || currentUser.id;
-    const cEmail = currentUser.email?.toLowerCase();
-    const cName = currentUser.name?.toLowerCase();
-    const cUsername = currentUser.username?.toLowerCase();
+    const cEmail = (currentUser.email || "").toLowerCase();
+    const cName = (currentUser.name || "").toLowerCase();
+    const cUsername = (currentUser.username || "").toLowerCase();
 
     const assignee =
       task.assignee ||
@@ -198,12 +208,13 @@ export default function Tasks() {
 
     if (typeof assignee === "object") {
       const empId = assignee._id || assignee.id;
-      const empEmail = assignee.email?.toLowerCase();
-      const empName = (assignee.name || assignee.username)?.toLowerCase();
+      const empEmail = (assignee.email || "").toLowerCase();
+      const empName = (assignee.name || assignee.username || "").toLowerCase();
       return (
         (cId && empId && String(cId) === String(empId)) ||
         (cEmail && empEmail && cEmail === empEmail) ||
-        (cName && empName && cName === empName)
+        (cName && empName && (cName === empName || cName.includes(empName) || empName.includes(cName))) ||
+        (cUsername && empName && cUsername === empName)
       );
     }
 
@@ -211,7 +222,7 @@ export default function Tasks() {
     return (
       (cId && String(cId).toLowerCase() === assigneeStr) ||
       (cEmail && cEmail === assigneeStr) ||
-      (cName && cName === assigneeStr) ||
+      (cName && (cName === assigneeStr || cName.includes(assigneeStr) || assigneeStr.includes(cName))) ||
       (cUsername && cUsername === assigneeStr)
     );
   };
@@ -437,20 +448,38 @@ export default function Tasks() {
     return `#${str.toUpperCase()}`;
   };
 
-  const getAssigneeInfo = (assigneeName) => {
-    const formatted = formatName(assigneeName) || "Unassigned";
+  const getAssigneeInfo = (assigneeInput) => {
+    let nameStr = "";
+    let avatarUrl = "";
+    let roleStr = "Developer";
+
+    if (assigneeInput && typeof assigneeInput === "object") {
+      nameStr = assigneeInput.name || assigneeInput.username || "";
+      avatarUrl = assigneeInput.avatar || "";
+      roleStr = assigneeInput.position || assigneeInput.role || "Developer";
+    } else if (typeof assigneeInput === "string") {
+      nameStr = assigneeInput;
+    }
+
+    const formatted = formatName(nameStr) || "Unassigned";
+
     const matchedEmp = employees.find(
       (e) =>
-        formatName(e.name || e.username).toLowerCase() === formatted.toLowerCase() ||
+        (e.name && formatName(e.name).toLowerCase() === formatted.toLowerCase()) ||
+        (e.username && formatName(e.username).toLowerCase() === formatted.toLowerCase()) ||
         (e.name && e.name.toLowerCase().includes(formatted.toLowerCase())) ||
-        (e.username && e.username.toLowerCase().includes(formatted.toLowerCase()))
+        (e.username && e.username.toLowerCase().includes(formatted.toLowerCase())) ||
+        (e._id && String(e._id) === String(assigneeInput)) ||
+        (e.id && String(e.id) === String(assigneeInput))
     );
+
     return {
       name: formatted,
       avatar:
+        avatarUrl ||
         matchedEmp?.avatar ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(formatted)}&background=0284c7&color=fff&bold=true&size=64`,
-      role: matchedEmp?.position || matchedEmp?.role || "Developer",
+      role: matchedEmp?.position || matchedEmp?.role || roleStr,
     };
   };
 
@@ -581,7 +610,7 @@ export default function Tasks() {
                           const assigneeInfo = getAssigneeInfo(task.assignee);
                           const isCreator = isTaskCreator(task);
                           const isAssignee = isTaskAssignee(task);
-                          const taskCreatorName = task.assignedBy || task.creatorName || "Atasan / PO";
+                          const taskCreatorName = formatName(task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO"));
 
                           return (
                             <div
@@ -613,7 +642,7 @@ export default function Tasks() {
                                   </span>
                                 ) : isCreator ? (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                                    <FaUserCircle size={10} className="text-indigo-500" /> Diberikan ke {task.assignee}
+                                    <FaUserCircle size={10} className="text-indigo-500" /> Diberikan ke {assigneeInfo.name}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
@@ -667,7 +696,7 @@ export default function Tasks() {
                                     alt={assigneeInfo.name}
                                     className="w-5.5 h-5.5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
                                     onError={(e) => {
-                                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignee)}&background=0284c7&color=fff&bold=true&size=64`;
+                                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
                                     }}
                                   />
                                   <span className="text-[11px] font-semibold text-gray-700 truncate">
@@ -746,7 +775,7 @@ export default function Tasks() {
                   {filteredTasks.map((task) => {
                     const assigneeInfo = getAssigneeInfo(task.assignee);
                     const isCreator = isTaskCreator(task);
-                    const creatorName = task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO");
+                    const creatorName = formatName(task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO"));
 
                     return (
                       <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
@@ -781,7 +810,7 @@ export default function Tasks() {
                               alt={assigneeInfo.name}
                               className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
                               onError={(e) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignee)}&background=0284c7&color=fff&bold=true&size=64`;
+                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
                               }}
                             />
                             <span>{assigneeInfo.name}</span>
@@ -990,7 +1019,7 @@ export default function Tasks() {
                   </span>
                   <div>
                     <h3 className="font-bold text-base text-gray-800">Atur Poin Task (PO / HR)</h3>
-                    <p className="text-xs text-gray-400 font-mono">{selectedTaskForPoint.id} • {selectedTaskForPoint.assignee}</p>
+                    <p className="text-xs text-gray-400 font-mono">{selectedTaskForPoint.id} • {getAssigneeInfo(selectedTaskForPoint.assignee).name}</p>
                   </div>
                 </div>
                 <button

@@ -74,9 +74,43 @@ export default function Dashboard() {
     };
   }, [startDate, endDate, isHR, userName]);
 
+  // Helper aman untuk membaca nama assignee / creator baik berupa object maupun string
+  const getAssigneeName = (assignee) => {
+    if (!assignee) return "Unassigned";
+    if (typeof assignee === "object") {
+      return assignee.name || assignee.username || assignee.email || "Unassigned";
+    }
+    return String(assignee);
+  };
+
+  const getCreatorName = (creator) => {
+    if (!creator) return "";
+    if (typeof creator === "object") {
+      return creator.name || creator.username || creator.email || "";
+    }
+    return String(creator);
+  };
+
   const displayedTasks = isHR
     ? taskList
-    : taskList.filter((t) => t.assignee.toLowerCase().includes("sari") || t.assignee.toLowerCase().includes(userName.toLowerCase()));
+    : taskList.filter((t) => {
+        if (!t) return false;
+        const assigneeStr = getAssigneeName(t.assignee || t.employee).toLowerCase();
+        const creatorStr = getCreatorName(t.assignedBy || t.creator || t.createdBy).toLowerCase();
+        const targetUser = (userName || "").toLowerCase();
+        const userEmail = (currentUser?.email || "").toLowerCase();
+        const userId = (currentUser?._id || currentUser?.id || "").toString().toLowerCase();
+
+        const tAssigneeId = (typeof t.assignee === "object" ? (t.assignee?._id || t.assignee?.id) : "")?.toString().toLowerCase();
+        const tCreatorId = (typeof t.assignedBy === "object" ? (t.assignedBy?._id || t.assignedBy?.id) : "")?.toString().toLowerCase();
+
+        return (
+          (userId && (tAssigneeId === userId || tCreatorId === userId)) ||
+          (userEmail && (assigneeStr.includes(userEmail) || creatorStr.includes(userEmail))) ||
+          (targetUser && (assigneeStr.includes(targetUser) || creatorStr.includes(targetUser))) ||
+          (targetUser.includes("sari") && (assigneeStr.includes("sari") || creatorStr.includes("sari")))
+        );
+      });
 
   const totalTasks = displayedTasks.length;
   const backlogCount = displayedTasks.filter((t) => t.status === "Backlog").length;
@@ -235,7 +269,7 @@ export default function Dashboard() {
                         {task.point ?? 0} Point
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Assign: <span className="font-semibold text-gray-600">{task.assignee}</span></p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Assign: <span className="font-semibold text-gray-600">{getAssigneeName(task.assignee || task.employee)}</span></p>
                   </div>
                 </div>
 
@@ -389,7 +423,7 @@ export default function Dashboard() {
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Assignee</label>
                     <input
                       type="text"
-                      value={editingTask.assignee}
+                      value={getAssigneeName(editingTask.assignee)}
                       onChange={(e) => setEditingTask({ ...editingTask, assignee: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light"
                     />
