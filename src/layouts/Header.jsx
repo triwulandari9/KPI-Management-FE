@@ -90,9 +90,9 @@ export default function Header() {
       return;
     }
 
-    // Batasan ukuran: Maks 2MB
-    if (file.size > 2 * 1024 * 1024) {
-      setPhotoError("Ukuran foto terlalu besar! Maksimal 2MB.");
+    // Batasan ukuran: Maks 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      setPhotoError("Ukuran foto terlalu besar! Maksimal 10MB.");
       return;
     }
 
@@ -325,7 +325,7 @@ export default function Header() {
                 </div>
 
                 <p className="text-[11px] text-gray-400 text-center">
-                  Hanya mendukung format: <b>JPG, JPEG, PNG</b> (Maks. 2MB)
+                  Hanya mendukung format: <b>JPG, JPEG, PNG</b> (Maks. 10MB)
                 </p>
 
                 {photoError && (

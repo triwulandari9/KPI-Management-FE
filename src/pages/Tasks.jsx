@@ -93,6 +93,9 @@ export default function Tasks() {
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTaskForPoint, setSelectedTaskForPoint] = useState(null);
   const [inputPoint, setInputPoint] = useState(5);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -109,6 +112,20 @@ export default function Tasks() {
     sla: "48 Jam",
     status: "Backlog",
   });
+
+  // Fungsi refresh / get task dari backend secara langsung
+  const fetchTasks = async () => {
+    try {
+      const tasksData = await taskService.getTasks();
+      if (tasksData && Array.isArray(tasksData)) {
+        setTasks(tasksData);
+        return tasksData;
+      }
+    } catch (err) {
+      console.error("Gagal refresh data tasks:", err);
+    }
+    return null;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -273,19 +290,23 @@ export default function Tasks() {
   const handleSavePoint = async (e) => {
     e.preventDefault();
     if (!selectedTaskForPoint) return;
+    const targetId = selectedTaskForPoint._id || selectedTaskForPoint.id;
 
     try {
-      await taskService.updateTaskPoint(selectedTaskForPoint.id, inputPoint);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === selectedTaskForPoint.id ? { ...t, point: Number(inputPoint) } : t
-        )
-      );
+      await taskService.updateTaskPoint(targetId, inputPoint);
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            (t._id || t.id) === targetId ? { ...t, point: Number(inputPoint) } : t
+          )
+        );
+      }
     } catch (err) {
       console.error("Gagal menyimpan poin:", err);
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === selectedTaskForPoint.id ? { ...t, point: Number(inputPoint) } : t
+          (t._id || t.id) === targetId ? { ...t, point: Number(inputPoint) } : t
         )
       );
     } finally {
@@ -322,10 +343,12 @@ export default function Tasks() {
     setDragOverColumn(null);
   };
 
+  // Simpan Task Baru: Post -> Refresh Tasks via API -> Close Modal
   const handleCreateTask = async (e) => {
     e.preventDefault();
     if (!newTask.title.trim()) return;
 
+    setIsSubmitting(true);
     const currentName = formatName(currentUser?.name || currentUser?.username || "User");
     const currentId = currentUser?._id || currentUser?.id;
 
@@ -353,11 +376,14 @@ export default function Tasks() {
 
     try {
       const created = await taskService.createTask(taskPayload);
-      setTasks((prev) => [
-        created || { ...taskPayload, id: `TASK-${Date.now().toString().slice(-4)}` },
-        ...prev,
-      ]);
-      await taskService.getAllTasks();
+      // Pas simpan langsung refresh api task, setelah post task langsung get task baru close
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) => [
+          created || { ...taskPayload, id: `TASK-${Date.now().toString().slice(-4)}` },
+          ...prev,
+        ]);
+      }
       setIsModalOpen(false);
       setNewTask({
         title: "",
@@ -388,19 +414,105 @@ export default function Tasks() {
         sla: "48 Jam",
         status: "Backlog",
       });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Buka Modal Edit Task
+  const handleOpenEditModal = (task) => {
+    let assigneeVal = "";
+    if (task.assignee && typeof task.assignee === "object") {
+      assigneeVal = formatName(task.assignee.name || task.assignee.username);
+    } else if (typeof task.assignee === "string") {
+      assigneeVal = formatName(task.assignee);
+    } else if (task.employee) {
+      if (typeof task.employee === "object") {
+        assigneeVal = formatName(task.employee.name || task.employee.username);
+      } else {
+        assigneeVal = formatName(task.employee);
+      }
+    }
+
+    setEditingTask({
+      id: task._id || task.id,
+      _id: task._id || task.id,
+      title: task.title || "",
+      description: task.description || "",
+      category: task.category || "Feature",
+      assignee: assigneeVal || currentUserName,
+      status: task.status || "Backlog",
+      deadline: task.deadline ? (task.deadline.includes("T") ? task.deadline.split("T")[0] : task.deadline) : "",
+      sla: task.sla || "48 Jam",
+      point: task.point ?? 5,
+      assignedBy: task.assignedBy || task.creatorName || currentUserName,
+      start: task.start || "",
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Simpan Perubahan Edit Task: Put -> Refresh Tasks via API -> Close Modal
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    if (!editingTask || !editingTask.title.trim()) return;
+
+    setIsSubmitting(true);
+    const taskId = editingTask._id || editingTask.id;
+
+    const matchedAssignee = employees.find(
+      (emp) =>
+        formatName(emp.name || emp.username).toLowerCase() === editingTask.assignee.toLowerCase() ||
+        (emp._id && String(emp._id) === String(editingTask.assignee)) ||
+        (emp.id && String(emp.id) === String(editingTask.assignee))
+    );
+
+    const taskPayload = {
+      ...editingTask,
+      title: editingTask.title.trim(),
+      description: editingTask.description?.trim() || "",
+      assignee: editingTask.assignee,
+      employee: matchedAssignee?._id || matchedAssignee?.id || editingTask.assignee,
+      assigneeId: matchedAssignee?._id || matchedAssignee?.id,
+      point: Number(editingTask.point) || 0,
+    };
+
+    try {
+      await taskService.updateTask(taskId, taskPayload);
+      // Pas simpan langsung refresh api task baru close
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) =>
+          prev.map((t) => ((t._id || t.id) === taskId ? { ...t, ...taskPayload } : t))
+        );
+      }
+      setIsEditModalOpen(false);
+      setEditingTask(null);
+    } catch (err) {
+      console.error("Gagal update task:", err);
+      // Fallback local update jika offline/error
+      setTasks((prev) =>
+        prev.map((t) => ((t._id || t.id) === taskId ? { ...t, ...taskPayload } : t))
+      );
+      setIsEditModalOpen(false);
+      setEditingTask(null);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       await taskService.updateTaskStatus(taskId, newStatus);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-      );
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) =>
+          prev.map((t) => ((t._id || t.id) === taskId ? { ...t, status: newStatus } : t))
+        );
+      }
     } catch (err) {
       console.error("Gagal mengubah status task:", err);
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+        prev.map((t) => ((t._id || t.id) === taskId ? { ...t, status: newStatus } : t))
       );
     }
   };
@@ -408,22 +520,25 @@ export default function Tasks() {
   const handleRejectQA = async (taskId) => {
     try {
       await taskService.rejectTaskQA(taskId);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-              ...t,
-              status: "On Progress",
-              backwardCount: (t.backwardCount || 0) + 1,
-            }
-            : t
-        )
-      );
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            (t._id || t.id) === taskId
+              ? {
+                ...t,
+                status: "On Progress",
+                backwardCount: (t.backwardCount || 0) + 1,
+              }
+              : t
+          )
+        );
+      }
     } catch (err) {
       console.error("Gagal reject QA:", err);
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === taskId
+          (t._id || t.id) === taskId
             ? {
               ...t,
               status: "On Progress",
@@ -612,23 +727,36 @@ export default function Tasks() {
 
                           return (
                             <div
-                              key={task.id}
+                              key={task._id || task.id}
                               draggable
-                              onDragStart={(e) => handleDragStart(e, task.id)}
+                              onDragStart={(e) => handleDragStart(e, task._id || task.id)}
                               className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2.5 group relative"
                             >
-                              {/* Top Meta: ID & Kategori Badge */}
+                              {/* Top Meta: ID & Kategori Badge & Edit Task */}
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70">
-                                  {formatTaskId(task.id)}
+                                  {formatTaskId(task._id || task.id)}
                                 </span>
-                                <span
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                                    }`}
-                                >
-                                  {CATEGORY_BADGES[task.category]?.icon}
-                                  {CATEGORY_BADGES[task.category]?.label || task.category}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                                      }`}
+                                  >
+                                    {CATEGORY_BADGES[task.category]?.icon}
+                                    {CATEGORY_BADGES[task.category]?.label || task.category}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditModal(task);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                                    title="Edit Task"
+                                  >
+                                    <FaEdit size={11} />
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Label Relasi Kepemilikan Task */}
@@ -765,7 +893,7 @@ export default function Tasks() {
                     <th className="p-4 whitespace-nowrap min-w-[120px]">SLA / Deadline</th>
                     <th className="p-4 whitespace-nowrap min-w-[110px] text-center">Point (SP)</th>
                     <th className="p-4 whitespace-nowrap min-w-[120px] text-center">Status</th>
-                    <th className="p-4 whitespace-nowrap min-w-[120px] text-center">Aksi Status</th>
+                    <th className="p-4 whitespace-nowrap min-w-[140px] text-center">Aksi / Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -775,10 +903,10 @@ export default function Tasks() {
                     const creatorName = formatName(task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO"));
 
                     return (
-                      <tr key={task.id} className="hover:bg-gray-50/70 transition-colors">
+                      <tr key={task._id || task.id} className="hover:bg-gray-50/70 transition-colors">
                         <td className="p-4">
                           <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70 inline-block mb-1">
-                            {formatTaskId(task.id)}
+                            {formatTaskId(task._id || task.id)}
                           </span>
                           <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
                           <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
@@ -840,22 +968,32 @@ export default function Tasks() {
                           </span>
                         </td>
                         <td className="p-4 text-center whitespace-nowrap">
-                          <div className="relative inline-block">
-                            <select
-                              value={task.status}
-                              onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                              className="text-xs font-semibold bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl pl-2.5 pr-6 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs appearance-none transition-colors"
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="relative inline-block">
+                              <select
+                                value={task.status}
+                                onChange={(e) => handleStatusChange(task._id || task.id, e.target.value)}
+                                className="text-xs font-semibold bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl pl-2.5 pr-6 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs appearance-none transition-colors"
+                              >
+                                {STATUSES.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <FaChevronDown
+                                size={8}
+                                className="text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(task)}
+                              className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary-light/20 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                              title="Edit Task"
                             >
-                              {STATUSES.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-                            <FaChevronDown
-                              size={8}
-                              className="text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
-                            />
+                              <FaEdit size={12} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -987,15 +1125,186 @@ export default function Tasks() {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                    Simpan Task
+                    {isSubmitting ? "Menyimpan..." : "Simpan Task"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Edit Task */}
+        {isEditModalOpen && editingTask && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">Edit Task</h3>
+                  <p className="text-xs text-gray-400">
+                    Perbarui informasi task <span className="font-mono font-bold text-slate-600">{formatTaskId(editingTask._id || editingTask.id)}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingTask(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateTask} className="mt-4 flex flex-col gap-4">
+                {/* Judul Task */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Judul Task <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingTask.title}
+                    onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                  />
+                </div>
+
+                {/* Deskripsi */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Deskripsi & Catatan</label>
+                  <textarea
+                    rows="3"
+                    value={editingTask.description}
+                    onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                  ></textarea>
+                </div>
+
+                {/* Kategori & Assignee */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Kategori Task</label>
+                    <select
+                      value={editingTask.category}
+                      onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer"
+                    >
+                      <option value="Feature">Feature (Fitur Utama)</option>
+                      <option value="Bug Ticket">Ticket Bug (Dari CH)</option>
+                      <option value="Tech Debt">Tech Debt (Hutang Teknis)</option>
+                      <option value="Improvement">Continuous Improvement</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Penerima Task (Assignee) <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editingTask.assignee}
+                      onChange={(e) => setEditingTask({ ...editingTask, assignee: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                      required
+                    >
+                      {getAssigneeOptions().map((opt) => (
+                        <option key={opt.empId || opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status & Story Points */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Status Alur Kerja</label>
+                    <select
+                      value={editingTask.status}
+                      onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Story Points (SP)</label>
+                    <select
+                      value={editingTask.point}
+                      onChange={(e) => setEditingTask({ ...editingTask, point: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
+                    >
+                      {SP_OPTIONS.map((sp) => (
+                        <option key={sp} value={sp}>
+                          {sp} SP
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tanggal & SLA */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Target Deadline</label>
+                    <input
+                      type="date"
+                      value={editingTask.deadline}
+                      onChange={(e) => setEditingTask({ ...editingTask, deadline: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Target SLA</label>
+                    <select
+                      value={editingTask.sla}
+                      onChange={(e) => setEditingTask({ ...editingTask, sla: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer"
+                    >
+                      <option value="24 Jam">24 Jam (Bug Urgent)</option>
+                      <option value="48 Jam">48 Jam (Normal SLA)</option>
+                      <option value="72 Jam">72 Jam</option>
+                      <option value="1 Minggu">1 Minggu (Feature)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingTask(null);
+                    }}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
                   </button>
                 </div>
               </form>

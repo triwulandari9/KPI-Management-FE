@@ -207,9 +207,9 @@ export default function Employees() {
       return;
     }
 
-    // Batasan ukuran: Maks 2MB
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError("Ukuran foto terlalu besar! Maksimal ukuran file 2MB.");
+    // Batasan ukuran: Maks 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      setAvatarError("Ukuran foto terlalu besar! Maksimal ukuran file 10MB.");
       return;
     }
 
@@ -698,7 +698,7 @@ export default function Employees() {
                           </button>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 2MB)</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 10MB)</p>
                     </div>
                   </div>
                   {avatarError && (
@@ -857,7 +857,7 @@ export default function Employees() {
                           </button>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 2MB)</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 10MB)</p>
                     </div>
                   </div>
                   {avatarError && (

@@ -6,6 +6,10 @@ export const taskService = {
     return response?.data || response;
   },
 
+  async getAllTasks(params = {}) {
+    return this.getTasks(params);
+  },
+
   async getTaskById(id) {
     const response = await apiClient.get(`/tasks/${id}`);
     return response?.data || response;
