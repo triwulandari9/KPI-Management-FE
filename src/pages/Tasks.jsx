@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FaPlus,
   FaFilter,
@@ -18,6 +18,8 @@ import {
   FaTrashAlt,
   FaLightbulb,
   FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight,
   FaInbox,
   FaShieldAlt,
   FaUserCheck,
@@ -103,6 +105,17 @@ export default function Tasks() {
   const [inputPoint, setInputPoint] = useState(5);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  const boardContainerRef = useRef(null);
+
+  const scrollBoard = (direction) => {
+    if (boardContainerRef.current) {
+      const scrollAmount = boardContainerRef.current.clientWidth;
+      boardContainerRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
 
   // State Form Tambah Task Baru
   const [newTask, setNewTask] = useState({
@@ -725,213 +738,248 @@ export default function Tasks() {
         {/* View Mode: KANBAN BOARD */}
         {viewMode === "kanban" && (
           <div className="w-full pb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start w-full">
-              {STATUSES.map((col) => {
-                const colTasks = filteredTasks.filter((t) => t.status === col.id);
-                const isOver = dragOverColumn === col.id;
+            {/* Quick Carousel Navigator 3 Kolom */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3.5 px-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-700">Papan Alur Tugas Sprint</span>
+                <span className="text-[11px] font-semibold text-primary bg-primary-light/30 border border-primary-light px-2.5 py-0.5 rounded-full">
+                  3 Kolom per Layar
+                </span>
+              </div>
 
-                return (
-                  <div
-                    key={col.id}
-                    onDragOver={handleDragOver}
-                    onDragEnter={() => handleDragEnter(col.id)}
-                    onDragLeave={() => handleDragLeave(col.id)}
-                    onDrop={(e) => handleDrop(e, col.id)}
-                    className={`rounded-2xl p-2.5 sm:p-3 border transition-all duration-200 flex flex-col min-h-[460px] w-full min-w-0 border-t-4 ${col.borderTop || "border-t-primary"} ${isOver
-                        ? "bg-primary-light/40 border-primary border-dashed shadow-md"
-                        : "bg-slate-100/70 border-slate-200/80"
-                      }`}
-                  >
-                    {/* Column Header */}
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200/80">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-2.5 h-2.5 rounded-full ring-2 ring-white shrink-0 ${col.dot}`}></span>
-                        <h3 className="text-xs font-bold text-gray-800 whitespace-nowrap uppercase tracking-wider">{col.label}</h3>
-                      </div>
-                      <span className="text-[11px] font-bold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs shrink-0">
-                        {colTasks.length}
-                      </span>
-                    </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => scrollBoard("left")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  title="Geser ke 3 Kolom Sebelumnya"
+                >
+                  <FaChevronLeft size={10} /> 3 Kolom Pertama
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollBoard("right")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  title="Geser ke 3 Kolom Berikutnya"
+                >
+                  3 Kolom Berikutnya <FaChevronRight size={10} />
+                </button>
+              </div>
+            </div>
 
-                    {/* Task Cards Container */}
-                    <div className="flex flex-col gap-3 flex-1">
-                      {colTasks.length === 0 ? (
-                        <div className="h-32 rounded-xl border-2 border-dashed border-gray-200/80 flex flex-col items-center justify-center gap-1.5 text-gray-400 text-xs text-center p-3 bg-white/40">
-                          <FaInbox className="text-gray-300" size={20} />
-                          <span className="text-[11px] font-medium">{isOver ? "Lepaskan task di sini" : "Tidak ada task"}</span>
+            {/* Scrollable Board Container (Pas 3 Kolom per Layar di Desktop) */}
+            <div
+              ref={boardContainerRef}
+              className="w-full overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent scroll-smooth snap-x snap-mandatory"
+            >
+              <div className="flex gap-4 items-start w-full pb-2">
+                {STATUSES.map((col) => {
+                  const colTasks = filteredTasks.filter((t) => t.status === col.id);
+                  const isOver = dragOverColumn === col.id;
+
+                  return (
+                    <div
+                      key={col.id}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter(col.id)}
+                      onDragLeave={() => handleDragLeave(col.id)}
+                      onDrop={(e) => handleDrop(e, col.id)}
+                      className={`rounded-2xl p-4 border transition-all duration-200 flex flex-col min-h-[480px] shrink-0 snap-start border-t-4 ${col.borderTop || "border-t-primary"} w-[85vw] sm:w-[calc((100%-1rem)/2)] lg:w-[calc((100%-2rem)/3)] ${isOver
+                          ? "bg-primary-light/40 border-primary border-dashed shadow-md"
+                          : "bg-slate-100/70 border-slate-200/80"
+                        }`}
+                    >
+                      {/* Column Header */}
+                      <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200/80">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-2.5 h-2.5 rounded-full ring-2 ring-white shrink-0 ${col.dot}`}></span>
+                          <h3 className="text-xs font-bold text-gray-800 whitespace-nowrap uppercase tracking-wider">{col.label}</h3>
                         </div>
-                      ) : (
-                        colTasks.map((task) => {
-                          const assigneeInfo = getAssigneeInfo(task.assignee);
-                          const isCreator = isTaskCreator(task);
-                          const isAssignee = isTaskAssignee(task);
-                          const taskCreatorName = formatName(task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO"));
+                        <span className="text-[11px] font-bold bg-white text-gray-600 px-2 py-0.5 rounded-full border border-gray-200 shadow-2xs shrink-0">
+                          {colTasks.length}
+                        </span>
+                      </div>
 
-                          return (
-                            <div
-                              key={task._id || task.id}
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, task._id || task.id)}
-                              className="bg-white rounded-xl sm:rounded-2xl p-3 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2 group relative w-full min-w-0"
-                            >
-                              {/* Top Meta: ID & Kategori Badge & Edit Task */}
-                              <div className="flex items-center justify-between gap-1 flex-wrap">
-                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70">
-                                  {formatTaskId(task._id || task.id)}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <span
-                                    className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
-                                      }`}
-                                  >
-                                    {CATEGORY_BADGES[task.category]?.icon}
-                                    {CATEGORY_BADGES[task.category]?.label || task.category}
+                      {/* Task Cards Container */}
+                      <div className="flex flex-col gap-3 flex-1">
+                        {colTasks.length === 0 ? (
+                          <div className="h-32 rounded-xl border-2 border-dashed border-gray-200/80 flex flex-col items-center justify-center gap-1.5 text-gray-400 text-xs text-center p-3 bg-white/40">
+                            <FaInbox className="text-gray-300" size={20} />
+                            <span className="text-[11px] font-medium">{isOver ? "Lepaskan task di sini" : "Tidak ada task"}</span>
+                          </div>
+                        ) : (
+                          colTasks.map((task) => {
+                            const assigneeInfo = getAssigneeInfo(task.assignee);
+                            const isCreator = isTaskCreator(task);
+                            const isAssignee = isTaskAssignee(task);
+                            const taskCreatorName = formatName(task.assignedBy || task.creatorName || (isCreator ? currentUserName : "Atasan / PO"));
+
+                            return (
+                              <div
+                                key={task._id || task.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, task._id || task.id)}
+                                className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2.5 group relative"
+                              >
+                                {/* Top Meta: ID & Kategori Badge & Edit Task */}
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70">
+                                    {formatTaskId(task._id || task.id)}
                                   </span>
-                                  {canModifyTask(task) && (
-                                    <div className="flex items-center gap-0.5">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenEditModal(task);
-                                        }}
-                                        className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-                                        title="Edit Task (Khusus Pembuat Task)"
-                                      >
-                                        <FaEdit size={11} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setTaskToDelete(task);
-                                        }}
-                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                        title="Hapus Task (Khusus Pembuat Task)"
-                                      >
-                                        <FaTrashAlt size={11} />
-                                      </button>
-                                    </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                                        }`}
+                                    >
+                                      {CATEGORY_BADGES[task.category]?.icon}
+                                      {CATEGORY_BADGES[task.category]?.label || task.category}
+                                    </span>
+                                    {canModifyTask(task) && (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenEditModal(task);
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                                          title="Edit Task (Khusus Pembuat Task)"
+                                        >
+                                          <FaEdit size={11} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTaskToDelete(task);
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                          title="Hapus Task (Khusus Pembuat Task)"
+                                        >
+                                          <FaTrashAlt size={11} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Label Relasi Kepemilikan Task */}
+                                <div className="flex items-center">
+                                  {isCreator && isAssignee ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                                      <FaUserCheck size={10} className="text-gray-500" /> Tugas Mandiri
+                                    </span>
+                                  ) : isCreator ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                                      <FaUserCircle size={10} className="text-indigo-500" /> Diberikan ke {assigneeInfo.name}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                                      <FaUserCircle size={10} className="text-emerald-500" /> Dari: {taskCreatorName}
+                                    </span>
                                   )}
                                 </div>
-                              </div>
 
-                              {/* Label Relasi Kepemilikan Task */}
-                              <div className="flex items-center">
-                                {isCreator && isAssignee ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
-                                    <FaUserCheck size={10} className="text-gray-500" /> Tugas Mandiri
-                                  </span>
-                                ) : isCreator ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                                    <FaUserCircle size={10} className="text-indigo-500" /> Diberikan ke {assigneeInfo.name}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
-                                    <FaUserCircle size={10} className="text-emerald-500" /> Dari: {taskCreatorName}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Judul & Deskripsi */}
-                              <div>
-                                <h4 className="text-[13px] font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug line-clamp-2">
-                                  {task.title}
-                                </h4>
-                                {task.description && (
-                                  <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mt-1">
-                                    {task.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Info Deadline & SP Point */}
-                              <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
-                                  <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline || "Tanpa deadline"}
-                                </span>
-
-                                {/* Badge Poin (Bisa diklik khusus PO / HR untuk atur nilai poin) */}
-                                {canSetPoint ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenPointModal(task);
-                                    }}
-                                    className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200/80 transition-all cursor-pointer shadow-2xs"
-                                    title="Klik untuk ubah poin task (Mode PO / HR)"
-                                  >
-                                    <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
-                                  </button>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-200/60 shadow-2xs">
-                                    <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Assignee Footer & Quick Status Picker */}
-                              <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-gray-100/80">
-                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                  <img
-                                    src={assigneeInfo.avatar}
-                                    alt={assigneeInfo.name}
-                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
-                                    onError={(e) => {
-                                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
-                                    }}
-                                  />
-                                  <span className="text-[10.5px] font-semibold text-gray-700 truncate">
-                                    {assigneeInfo.name}
-                                  </span>
+                                {/* Judul & Deskripsi */}
+                                <div>
+                                  <h4 className="text-[13px] font-bold text-gray-800 group-hover:text-primary transition-colors leading-snug line-clamp-2">
+                                    {task.title}
+                                  </h4>
+                                  {task.description && (
+                                    <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mt-1">
+                                      {task.description}
+                                    </p>
+                                  )}
                                 </div>
 
-                                {/* Dropdown pemindah status cepat */}
-                                <div className="relative shrink-0">
-                                  <select
-                                    value={task.status}
-                                    onChange={(e) => handleStatusChange(task._id || task.id, e.target.value)}
-                                    className="text-[9.5px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-1.5 pr-4 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors max-w-[85px] truncate"
-                                  >
-                                    {STATUSES.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <FaChevronDown
-                                    size={6}
-                                    className="text-gray-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"
-                                  />
-                                </div>
-                              </div>
+                                {/* Info Deadline & SP Point */}
+                                <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                                    <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline || "Tanpa deadline"}
+                                  </span>
 
-                              {/* Tombol Aksi Khusus jika berada di QA */}
-                              {task.status === "QA" && (
-                                <div className="pt-2 flex gap-1.5 border-t border-gray-100">
-                                  <button
-                                    onClick={() => handleRejectQA(task._id || task.id)}
-                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-2 rounded-xl border border-red-200/80 cursor-pointer shadow-2xs transition-colors"
-                                    title="Kembalikan task ke Developer karena ada temuan bug"
-                                  >
-                                    <FaExclamationTriangle size={9} /> Reject Bug
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusChange(task._id || task.id, "Done")}
-                                    className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs transition-colors"
-                                  >
-                                    <FaCheckCircle size={10} /> Lolos Done
-                                  </button>
+                                  {/* Badge Poin (Bisa diklik khusus PO / HR untuk atur nilai poin) */}
+                                  {canSetPoint ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenPointModal(task);
+                                      }}
+                                      className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200/80 transition-all cursor-pointer shadow-2xs"
+                                      title="Klik untuk ubah poin task (Mode PO / HR)"
+                                    >
+                                      <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                                    </button>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 font-bold text-[10px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-200/60 shadow-2xs">
+                                      <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
+
+                                {/* Assignee Footer & Quick Status Picker */}
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100/80">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <img
+                                      src={assigneeInfo.avatar}
+                                      alt={assigneeInfo.name}
+                                      className="w-5.5 h-5.5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
+                                      onError={(e) => {
+                                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
+                                      }}
+                                    />
+                                    <span className="text-[11px] font-semibold text-gray-700 truncate">
+                                      {assigneeInfo.name}
+                                    </span>
+                                  </div>
+
+                                  {/* Dropdown pemindah status cepat */}
+                                  <div className="relative shrink-0">
+                                    <select
+                                      value={task.status}
+                                      onChange={(e) => handleStatusChange(task._id || task.id, e.target.value)}
+                                      className="text-[10px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-2 pr-5 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors"
+                                    >
+                                      {STATUSES.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                          {s.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <FaChevronDown
+                                      size={7}
+                                      className="text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Tombol Aksi Khusus jika berada di QA */}
+                                {task.status === "QA" && (
+                                  <div className="pt-2 flex gap-1.5 border-t border-gray-100">
+                                    <button
+                                      onClick={() => handleRejectQA(task._id || task.id)}
+                                      className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-2 rounded-xl border border-red-200/80 cursor-pointer shadow-2xs transition-colors"
+                                      title="Kembalikan task ke Developer karena ada temuan bug"
+                                    >
+                                      <FaExclamationTriangle size={9} /> Reject Bug
+                                    </button>
+                                    <button
+                                      onClick={() => handleStatusChange(task._id || task.id, "Done")}
+                                      className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs transition-colors"
+                                    >
+                                      <FaCheckCircle size={10} /> Lolos Done
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
