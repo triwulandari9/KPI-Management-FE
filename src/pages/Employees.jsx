@@ -152,7 +152,6 @@ export default function Employees() {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&bold=true&rounded=true`;
   };
 
-  // Fungsi Kompresi Foto agar Base64 berukuran kecil (~20-40KB) dan aman di database
   const compressImage = (file, maxWidth = 400, maxHeight = 400, quality = 0.7) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -182,7 +181,6 @@ export default function Employees() {
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Convert to compressed jpeg base64
           const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
           resolve(compressedBase64);
         };
@@ -192,7 +190,6 @@ export default function Employees() {
     });
   };
 
-  // Handle upload & validasi foto avatar (Modal Tambah & Modal Edit)
   const handleAvatarChange = async (e, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -321,12 +318,10 @@ export default function Employees() {
       let updated = null;
       let lastError = null;
 
-      // 1. Coba update via employeeService dengan empId
       try {
         updated = await employeeService.updateEmployee(empId, editFormData);
       } catch (err1) {
         lastError = err1;
-        // 2. Jika gagal dan ini akun sendiri, coba dengan currentUser._id / currentUser.id
         const currentUserId = currentUser?._id || currentUser?.id;
         if (isSelf && currentUserId && currentUserId !== empId) {
           try {
@@ -335,7 +330,6 @@ export default function Employees() {
             lastError = err2;
           }
         }
-        // 3. Coba juga via authService.updateProfile jika akun sendiri
         if (!updated && isSelf) {
           try {
             updated = await authService.updateProfile(editFormData);
@@ -360,9 +354,7 @@ export default function Employees() {
         setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
       }
       if (isSelf) {
-        // Update global user profile (dispatches event)
         updateUserProfile?.({ avatar: editFormData.avatar });
-        // Also broadcast via localStorage for other tabs (employees list)
         try {
           localStorage.setItem(
             "kpi_avatar_updated",

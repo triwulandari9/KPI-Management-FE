@@ -31,7 +31,6 @@ export default function Header() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Kompresi foto agar ukuran string Base64 kecil (~20-40KB) sehingga selalu diterima oleh database backend
   const compressImageFile = (file, maxWidth = 300, maxHeight = 300, quality = 0.75) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -127,7 +126,6 @@ export default function Header() {
       let savedSuccessfully = false;
       let lastError = null;
 
-      // Kumpulkan kemungkinan ID target (ID User dan ID Dokumen Employee jika berbeda)
       const primaryId = currentUser?._id || currentUser?.id;
       let matchedEmpId = primaryId;
 
@@ -149,7 +147,6 @@ export default function Header() {
         console.warn("Lookup employee list:", findErr.message);
       }
 
-      // 1. Coba update via employeeService dengan matchedEmpId (ID Employee di database)
       if (matchedEmpId) {
         try {
           await employeeService.updateEmployee(matchedEmpId, payload);
@@ -160,7 +157,6 @@ export default function Header() {
         }
       }
 
-      // 2. Jika gagal dan primaryId berbeda dari matchedEmpId, coba update via primaryId (User ID)
       if (!savedSuccessfully && primaryId && primaryId !== matchedEmpId) {
         try {
           await employeeService.updateEmployee(primaryId, payload);
@@ -171,7 +167,6 @@ export default function Header() {
         }
       }
 
-      // 3. Jika belum berhasil, coba via authService.updateProfile
       if (!savedSuccessfully) {
         try {
           await authService.updateProfile(payload);
@@ -182,15 +177,12 @@ export default function Header() {
         }
       }
 
-      // Jika semua percobaan ke server gagal, lemparkan error agar ditampilkan di modal
       if (!savedSuccessfully) {
         throw lastError || new Error("Gagal menyimpan foto ke server. Server menolak perubahan.");
       }
 
-      // Update state lokal & localStorage setelah terkonfirmasi berhasil tersimpan di server
       updateUserProfile({ avatar: newAvatarPreview });
 
-      // Notifikasi agar komponen lain langsung memperbarui tampilan kartu
       try {
         localStorage.setItem(
           "kpi_avatar_updated",

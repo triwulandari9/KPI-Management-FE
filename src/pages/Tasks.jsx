@@ -33,10 +33,8 @@ import { useAuth } from "../context/AuthContext";
 import { taskService } from "../services/taskService";
 import { employeeService } from "../services/employeeService";
 
-// Nilai Poin Standar Sesuai Catatan Mentor / ClickUp
 const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
 
-// Status alur kerja ala ClickUp
 const STATUSES = [
   { id: "Backlog", label: "Backlog", color: "bg-slate-50 text-slate-700 border-slate-200", dot: "bg-slate-400", borderTop: "border-t-slate-400" },
   { id: "Ready", label: "Ready", color: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", borderTop: "border-t-sky-500" },
@@ -57,7 +55,6 @@ export default function Tasks() {
   const { collapsed } = useSidebar();
   const { currentUser } = useAuth();
 
-  // Role & Permission Checks
   const userRole = (currentUser?.role || "").toUpperCase();
   const userPosition = (currentUser?.position || "").toLowerCase();
   const isPO =
@@ -69,7 +66,6 @@ export default function Tasks() {
   const isRegularEmployee = !isPO && !isHR;
   const canSetPoint = isPO || isHR;
 
-  // Normalisasi nama dari backend (bisa ALL CAPS atau object) menjadi Title Case yang aman
   const formatName = (input) => {
     if (!input) return "";
     let str = "";
@@ -179,12 +175,6 @@ export default function Tasks() {
     }
   }, [currentUser]);
 
-  // -------------------------------------------------------------
-  // PRIVACY & VISIBILITY RULES (Private Task Access)
-  // -------------------------------------------------------------
-  // 1. Pembuat Task (assignedBy / creator) dapat melihat task yang dibuatnya.
-  // 2. Penerima Task (employee / assignee) dapat melihat task yang di-assign padanya.
-  // 3. User TIDAK BISA melihat task milik orang lain di luar kedua kondisi di atas.
   const isTaskCreator = (task) => {
     if (!task || !currentUser) return false;
     const cId = currentUser._id || currentUser.id;
@@ -260,14 +250,10 @@ export default function Tasks() {
     );
   };
 
-  // Rule Utama: User hanya dapat melihat task jika ia adalah Pembuat ATAU Penerima
   const userCanSee = (task) => {
     return isTaskCreator(task) || isTaskAssignee(task);
   };
 
-  // Rule Manajemen Task:
-  // - Edit: bisa dilakukan oleh semua pengguna yang memiliki akses ke task
-  // - Hapus: HANYA bisa dilakukan oleh si pembuat task (atau PO/HR)
   const canDeleteTask = (task) => {
     if (!task) return false;
     return isTaskCreator(task) || isPO || isHR;
@@ -277,9 +263,6 @@ export default function Tasks() {
     .filter(userCanSee)
     .filter((task) => selectedCategory === "All" || task.category === selectedCategory);
 
-  // -------------------------------------------------------------
-  // PILIHAN ASSIGNEE: Mengambil semua data employee yang ada
-  // -------------------------------------------------------------
   const getAssigneeOptions = () => {
     const currentName = formatName(currentUser?.name || "Saya");
     const currentId = currentUser?._id || currentUser?.id;
@@ -301,7 +284,6 @@ export default function Tasks() {
       });
     }
 
-    // Fallback jika data employees belum selesai dimuat dari backend
     return [
       { value: currentName, label: `${currentName} (Saya)`, empId: currentId },
       { value: "Sari", label: "Sari (Frontend Developer)", empId: "sari" },
@@ -400,7 +382,6 @@ export default function Tasks() {
 
     try {
       const created = await taskService.createTask(taskPayload);
-      // Pas simpan langsung refresh api task, setelah post task langsung get task baru close
       const refreshed = await fetchTasks();
       if (!refreshed) {
         setTasks((prev) => [
@@ -421,7 +402,6 @@ export default function Tasks() {
       });
     } catch (err) {
       console.error("Gagal membuat task baru:", err);
-      // Fallback local jika server offline
       const localTask = {
         ...taskPayload,
         id: `TASK-${Date.now().toString().slice(-4)}`,
@@ -443,7 +423,6 @@ export default function Tasks() {
     }
   };
 
-  // Buka Modal Edit Task
   const handleOpenEditModal = (task) => {
     let assigneeVal = "";
     if (task.assignee && typeof task.assignee === "object") {
@@ -475,7 +454,6 @@ export default function Tasks() {
     setIsEditModalOpen(true);
   };
 
-  // Simpan Perubahan Edit Task: Put -> Refresh Tasks via API -> Close Modal
   const handleUpdateTask = async (e) => {
     e.preventDefault();
     if (!editingTask || !editingTask.title.trim()) return;
@@ -502,7 +480,6 @@ export default function Tasks() {
 
     try {
       await taskService.updateTask(taskId, taskPayload);
-      // Pas simpan langsung refresh api task baru close
       const refreshed = await fetchTasks();
       if (!refreshed) {
         setTasks((prev) =>
@@ -513,7 +490,6 @@ export default function Tasks() {
       setEditingTask(null);
     } catch (err) {
       console.error("Gagal update task:", err);
-      // Fallback local update jika offline/error
       setTasks((prev) =>
         prev.map((t) => ((t._id || t.id) === taskId ? { ...t, ...taskPayload } : t))
       );
@@ -524,7 +500,6 @@ export default function Tasks() {
     }
   };
 
-  // Hapus Task: Panggil API delete -> refresh task dari API -> tutup modal konfirmasi
   const handleDeleteTask = async () => {
     if (!taskToDelete || !canDeleteTask(taskToDelete)) return;
     const taskId = taskToDelete._id || taskToDelete.id;
@@ -543,7 +518,6 @@ export default function Tasks() {
       }
     } catch (err) {
       console.error("Gagal menghapus task:", err);
-      // Fallback local delete
       setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
       setTaskToDelete(null);
       if (editingTask && (editingTask._id || editingTask.id) === taskId) {
@@ -660,10 +634,8 @@ export default function Tasks() {
       <Sidebar />
 
       <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
-        {/* Page Header */}
-        <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian dengan akses privat">
+        <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            {/* Status Akses / Role Badge */}
             <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 shadow-2xs">
               <FaShieldAlt className={isPO ? "text-amber-500" : isHR ? "text-purple-500" : "text-primary"} />
               <span>
@@ -679,21 +651,6 @@ export default function Tasks() {
             </button>
           </div>
         </PageHeader>
-
-        {/* Banner Penjelasan Hak Akses Privat */}
-        <div className="mb-5 p-3.5 bg-white border border-blue-100 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-2.5 text-xs text-gray-600">
-            <div className="w-7 h-7 rounded-xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
-              <FaShieldAlt size={13} />
-            </div>
-            <span>
-              <b>Akses Privat Aktif:</b> Anda hanya melihat task yang <b>Anda buat</b> (<i>assignedBy</i>) atau task yang <b>ditugaskan kepada Anda</b> (<i>assignee</i>).
-            </span>
-          </div>
-          <span className="text-[11px] font-bold text-primary bg-blue-50 px-2.5 py-1 rounded-full shrink-0 hidden sm:inline-block">
-            {filteredTasks.length} Task Ditampilkan
-          </span>
-        </div>
 
         {/* Toolbar & Filter Bar */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
@@ -854,7 +811,7 @@ export default function Tasks() {
                                             setTaskToDelete(task);
                                           }}
                                           className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                          title="Hapus Task (Khusus Pembuat Task)"
+                                          title="Hapus Task"
                                         >
                                           <FaTrashAlt size={11} />
                                         </button>
@@ -898,7 +855,7 @@ export default function Tasks() {
                                     <FaCalendarAlt className="text-gray-400" size={10} /> {task.deadline || "Tanpa deadline"}
                                   </span>
 
-                                  {/* Badge Poin (Bisa diklik khusus PO / HR untuk atur nilai poin) */}
+                                  {/* Badge Poin */}
                                   {canSetPoint ? (
                                     <button
                                       onClick={(e) => {
@@ -953,7 +910,7 @@ export default function Tasks() {
                                   </div>
                                 </div>
 
-                                {/* Tombol Aksi Khusus jika berada di QA */}
+                                {/* Tombol Aksi QA */}
                                 {task.status === "QA" && (
                                   <div className="pt-2 flex gap-1.5 border-t border-gray-100">
                                     <button
@@ -1105,7 +1062,7 @@ export default function Tasks() {
                                   type="button"
                                   onClick={() => setTaskToDelete(task)}
                                   className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-                                  title="Hapus Task (Khusus Pembuat Task)"
+                                  title="Hapus Task"
                                 >
                                   <FaTrashAlt size={12} />
                                 </button>
@@ -1227,14 +1184,6 @@ export default function Tasks() {
                       <option value="1 Minggu">1 Minggu (Feature)</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Info Catatan tentang Akses & Poin */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-[11px] text-blue-700 flex items-start gap-2.5">
-                  <FaLightbulb className="text-blue-600 shrink-0 text-sm mt-0.5" />
-                  <span>
-                    <b>Privasi & Story Points:</b> Task ini hanya dapat dilihat oleh Anda (sebagai pembuat) dan penerima task. Penilaian Story Points (SP) akan dinilai oleh <b>Product Owner (PO) / HR</b>.
-                  </span>
                 </div>
 
                 {/* Footer Buttons */}
@@ -1445,7 +1394,7 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* MODAL: Atur Poin Task (Khusus PO / HR) */}
+        {/* MODAL: Atur Poin Task */}
         {selectedTaskForPoint && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
@@ -1455,7 +1404,7 @@ export default function Tasks() {
                     SP
                   </span>
                   <div>
-                    <h3 className="font-bold text-base text-gray-800">Atur Poin Task (PO / HR)</h3>
+                    <h3 className="font-bold text-base text-gray-800">Atur Poin Task</h3>
                     <p className="text-xs text-gray-400 font-mono">{selectedTaskForPoint.id} • {getAssigneeInfo(selectedTaskForPoint.assignee).name}</p>
                   </div>
                 </div>
@@ -1475,7 +1424,7 @@ export default function Tasks() {
                   </p>
                 </div>
 
-                {/* Pilihan Story Points Standar ClickUp */}
+                {/* Pilihan Story Points */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-2">
                     Pilih Story Point (SP):
@@ -1529,7 +1478,7 @@ export default function Tasks() {
           </div>
         )}
 
-        {/* MODAL: Konfirmasi Hapus Task (Khusus Pembuat Task / PO / HR) */}
+        {/* MODAL: Konfirmasi Hapus Task */}
         {taskToDelete && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in duration-200">

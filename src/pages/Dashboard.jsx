@@ -23,7 +23,6 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { dashboardService } from "../services/dashboardService";
 
-// Nilai Poin Standar Sesuai Catatan Mentor / ClickUp
 const SP_OPTIONS = [1, 2, 3, 4, 5, 8, 12, 16, 18, 20, 28, 241];
 
 const STATUS_CONFIG = {
@@ -74,7 +73,6 @@ export default function Dashboard() {
     };
   }, [startDate, endDate, isHR, userName]);
 
-  // Helper aman untuk membaca nama assignee / creator baik berupa object maupun string
   const getAssigneeName = (assignee) => {
     if (!assignee) return "Unassigned";
     if (typeof assignee === "object") {
@@ -292,20 +290,19 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  {/* Action Buttons: Khusus HR */}
                   {isHR ? (
                     <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
                       <button
                         onClick={() => setEditingTask({ ...task })}
                         className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-xl px-3 py-1.5 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all cursor-pointer"
-                        title="Ubah data & poin task (Mode HR)"
+                        title="Edit task"
                       >
                         <FaEdit size={11} className="text-primary" /> Edit
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(task.id)}
                         className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold border border-red-200 bg-red-50/50 rounded-xl px-3 py-1.5 text-red-600 hover:bg-red-100/70 transition-all cursor-pointer"
-                        title="Hapus task (Mode HR)"
+                        title="Hapus task"
                       >
                         <FaTrashAlt size={11} /> Delete
                       </button>

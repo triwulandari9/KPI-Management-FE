@@ -45,7 +45,6 @@ const EMPLOYEES = [
   { id: "EMP-004", name: "Dimas Pratama", role: "Quality Assurance" },
 ];
 
-// Data Default Nilai Input Raw KPI Berdasarkan Catatan Mentor & Rumus
 const DEFAULT_INPUTS = {
   1: { onTime: 9, total: 10 },
   2: { onSla: 19, total: 20 },
@@ -57,7 +56,6 @@ const DEFAULT_INPUTS = {
   8: { spEarned: 98, spTarget: 88 },
 };
 
-// Data 8 Indikator KPI Sesuai Tabel Excel Mentoring (PT. JAGA)
 const KPI_METRICS_TEMPLATE = [
   {
     no: 1,
@@ -117,8 +115,8 @@ const KPI_METRICS_TEMPLATE = [
     categoryBg: "bg-amber-100 text-amber-800 border-amber-200",
     objective: "Akuisisi dan live produk utama klinik sesuai target",
     kpiName: "Tech Debt Completion",
-    description: "Penyelesaian hutang teknis modul legacy. (Catatan mentor: 0/0 dihitung 100%).",
-    formulaText: "(Tech Debt Selesai ÷ Target Tech Debt) × 100% [0/0 = 100%]",
+    description: "Penyelesaian hutang teknis modul legacy.",
+    formulaText: "(Tech Debt Selesai ÷ Target Tech Debt) × 100%",
     frequency: "Monthly",
     weight: 5,
     levels: { l1: "< 40%", l2: "40%", l3: "60%", l4: "≥ 80%" },
@@ -130,7 +128,7 @@ const KPI_METRICS_TEMPLATE = [
     categoryBg: "bg-rose-100 text-rose-800 border-rose-200",
     objective: "Akuisisi dan live produk utama klinik sesuai target",
     kpiName: "Task Completion Rate",
-    description: "Rata-rata waktu pengerjaan task via ClickUp Track Time. Target < 48 Jam.",
+    description: "Rata-rata waktu pengerjaan task. Target < 48 Jam.",
     formulaText: "Rata-rata Durasi Selesai (Jam) [Target: < 48 Jam]",
     frequency: "Monthly",
     weight: 15,
@@ -156,7 +154,7 @@ const KPI_METRICS_TEMPLATE = [
     categoryBg: "bg-emerald-100 text-emerald-800 border-emerald-200",
     objective: "Akuisisi dan live produk utama klinik sesuai target",
     kpiName: "Sprint Point (SP)",
-    description: "Total akumulasi Story Point yang dinilai oleh PO/HR di ClickUp.",
+    description: "Total akumulasi Story Point yang berhasil dicapai.",
     formulaText: "(Total SP Berhasil Tercapai ÷ Target SP Bulanan) × 100%",
     frequency: "Yearly",
     weight: 15,
@@ -331,7 +329,6 @@ export default function KpiTracking() {
   };
 
 
-  // Kalkulasi Otomatis Seluruh Nilai KPI Berdasarkan Rumus
   const computedMetrics = KPI_METRICS_TEMPLATE.map((kpi) => {
     let actual = "";
     let atPercent = "";
@@ -928,9 +925,6 @@ export default function KpiTracking() {
 
               {/* Body Modal: 8 Input Form Cards */}
               <div className="my-4 flex-1 overflow-y-auto pr-1 space-y-4 text-xs">
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 text-blue-800 text-xs leading-relaxed">
-                  Silakan masukkan angka capaian riil Anda pada setiap indikator di bawah. Rumus di balik layar akan otomatis menghitung nilai Actual, Persentase Capaian (A/T), dan Level Hasil yang akan langsung dimasukkan ke tabel evaluasi setelah Anda mengklik simpan!
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {/* KPI 1: On Time Delivery */}
