@@ -15,6 +15,7 @@ import {
   FaUserCircle,
   FaStar,
   FaEdit,
+  FaTrashAlt,
   FaLightbulb,
   FaChevronDown,
   FaInbox,
@@ -95,6 +96,8 @@ export default function Tasks() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTaskForPoint, setSelectedTaskForPoint] = useState(null);
   const [inputPoint, setInputPoint] = useState(5);
@@ -247,6 +250,14 @@ export default function Tasks() {
   // Rule Utama: User hanya dapat melihat task jika ia adalah Pembuat ATAU Penerima
   const userCanSee = (task) => {
     return isTaskCreator(task) || isTaskAssignee(task);
+  };
+
+  // Rule Manajemen Task (Edit & Hapus):
+  // Fitur edit dan hapus task HANYA muncul untuk si pembuat task (atau PO/HR)
+  // Penerima task yang bukan pembuat hanya dapat melihat dan memindahkan alur task
+  const canModifyTask = (task) => {
+    if (!task) return false;
+    return isTaskCreator(task) || isPO || isHR;
   };
 
   const filteredTasks = tasks
@@ -500,6 +511,37 @@ export default function Tasks() {
     }
   };
 
+  // Hapus Task: Panggil API delete -> refresh task dari API -> tutup modal konfirmasi
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+    const taskId = taskToDelete._id || taskToDelete.id;
+    setIsDeleting(true);
+
+    try {
+      await taskService.deleteTask(taskId);
+      const refreshed = await fetchTasks();
+      if (!refreshed) {
+        setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
+      }
+      setTaskToDelete(null);
+      if (editingTask && (editingTask._id || editingTask.id) === taskId) {
+        setIsEditModalOpen(false);
+        setEditingTask(null);
+      }
+    } catch (err) {
+      console.error("Gagal menghapus task:", err);
+      // Fallback local delete
+      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
+      setTaskToDelete(null);
+      if (editingTask && (editingTask._id || editingTask.id) === taskId) {
+        setIsEditModalOpen(false);
+        setEditingTask(null);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       await taskService.updateTaskStatus(taskId, newStatus);
@@ -745,17 +787,32 @@ export default function Tasks() {
                                     {CATEGORY_BADGES[task.category]?.icon}
                                     {CATEGORY_BADGES[task.category]?.label || task.category}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenEditModal(task);
-                                    }}
-                                    className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-                                    title="Edit Task"
-                                  >
-                                    <FaEdit size={11} />
-                                  </button>
+                                  {canModifyTask(task) && (
+                                    <div className="flex items-center gap-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditModal(task);
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                                        title="Edit Task (Khusus Pembuat Task)"
+                                      >
+                                        <FaEdit size={11} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTaskToDelete(task);
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                        title="Hapus Task (Khusus Pembuat Task)"
+                                      >
+                                        <FaTrashAlt size={11} />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -833,7 +890,7 @@ export default function Tasks() {
                                 <div className="relative shrink-0">
                                   <select
                                     value={task.status}
-                                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                    onChange={(e) => handleStatusChange(task._id || task.id, e.target.value)}
                                     className="text-[10px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-2 pr-5 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors"
                                   >
                                     {STATUSES.map((s) => (
@@ -853,14 +910,14 @@ export default function Tasks() {
                               {task.status === "QA" && (
                                 <div className="pt-2 flex gap-1.5 border-t border-gray-100">
                                   <button
-                                    onClick={() => handleRejectQA(task.id)}
+                                    onClick={() => handleRejectQA(task._id || task.id)}
                                     className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 py-1.5 px-2 rounded-xl border border-red-200/80 cursor-pointer shadow-2xs transition-colors"
                                     title="Kembalikan task ke Developer karena ada temuan bug"
                                   >
                                     <FaExclamationTriangle size={9} /> Reject Bug
                                   </button>
                                   <button
-                                    onClick={() => handleStatusChange(task.id, "Done")}
+                                    onClick={() => handleStatusChange(task._id || task.id, "Done")}
                                     className="flex-1 flex items-center justify-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs transition-colors"
                                   >
                                     <FaCheckCircle size={10} /> Lolos Done
@@ -986,14 +1043,26 @@ export default function Tasks() {
                                 className="text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
                               />
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(task)}
-                              className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary-light/20 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-                              title="Edit Task"
-                            >
-                              <FaEdit size={12} />
-                            </button>
+                            {canModifyTask(task) && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(task)}
+                                  className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary-light/20 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                                  title="Edit Task (Khusus Pembuat Task)"
+                                >
+                                  <FaEdit size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setTaskToDelete(task)}
+                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                                  title="Hapus Task (Khusus Pembuat Task)"
+                                >
+                                  <FaTrashAlt size={12} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1287,25 +1356,41 @@ export default function Tasks() {
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditModalOpen(false);
-                      setEditingTask(null);
-                    }}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-                  </button>
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  {canModifyTask(editingTask) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTaskToDelete(editingTask);
+                      }}
+                      disabled={isSubmitting}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <FaTrashAlt size={12} /> Hapus Task
+                    </button>
+                  ) : (
+                    <div></div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        setEditingTask(null);
+                      }}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -1392,6 +1477,52 @@ export default function Tasks() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: Konfirmasi Hapus Task (Khusus Pembuat Task / PO / HR) */}
+        {taskToDelete && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
+                  <FaTrashAlt size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-900">Hapus Task?</h3>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Apakah Anda yakin ingin menghapus task ini? Tindakan ini bersifat permanen dan tidak dapat dibatalkan.
+                  </p>
+                  <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                    <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                      {formatTaskId(taskToDelete._id || taskToDelete.id)}
+                    </span>
+                    <p className="text-xs font-bold text-gray-800 mt-1 line-clamp-2">
+                      {taskToDelete.title}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setTaskToDelete(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteTask}
+                  disabled={isDeleting}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? "Menghapus..." : "Ya, Hapus Task"}
+                </button>
+              </div>
             </div>
           </div>
         )}
