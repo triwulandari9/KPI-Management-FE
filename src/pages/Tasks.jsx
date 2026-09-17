@@ -642,11 +642,11 @@ export default function Tasks() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen w-full max-w-full overflow-x-hidden">
+    <div className="bg-gray-50 min-h-screen">
       <Header />
       <Sidebar />
 
-      <main className={`transition-all duration-300 pt-20 sm:pt-24 px-3 sm:px-5 lg:px-6 pb-8 sm:pb-12 w-full max-w-full overflow-x-hidden ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
+      <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian dengan akses privat">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
