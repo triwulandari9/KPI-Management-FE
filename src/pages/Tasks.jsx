@@ -642,11 +642,11 @@ export default function Tasks() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen w-full max-w-full overflow-x-hidden">
       <Header />
       <Sidebar />
 
-      <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
+      <main className={`transition-all duration-300 pt-20 sm:pt-24 px-3 sm:px-5 lg:px-6 pb-8 sm:pb-12 w-full max-w-full overflow-x-hidden ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
         {/* Page Header */}
         <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian dengan akses privat">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
@@ -724,8 +724,8 @@ export default function Tasks() {
 
         {/* View Mode: KANBAN BOARD */}
         {viewMode === "kanban" && (
-          <div className="overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-            <div className="flex gap-4 items-start min-w-max pb-2">
+          <div className="w-full pb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start w-full">
               {STATUSES.map((col) => {
                 const colTasks = filteredTasks.filter((t) => t.status === col.id);
                 const isOver = dragOverColumn === col.id;
@@ -737,7 +737,7 @@ export default function Tasks() {
                     onDragEnter={() => handleDragEnter(col.id)}
                     onDragLeave={() => handleDragLeave(col.id)}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className={`rounded-2xl p-3.5 border transition-all duration-200 flex flex-col min-h-[460px] w-[285px] sm:w-[305px] shrink-0 border-t-4 ${col.borderTop || "border-t-primary"} ${isOver
+                    className={`rounded-2xl p-2.5 sm:p-3 border transition-all duration-200 flex flex-col min-h-[460px] w-full min-w-0 border-t-4 ${col.borderTop || "border-t-primary"} ${isOver
                         ? "bg-primary-light/40 border-primary border-dashed shadow-md"
                         : "bg-slate-100/70 border-slate-200/80"
                       }`}
@@ -772,16 +772,16 @@ export default function Tasks() {
                               key={task._id || task.id}
                               draggable
                               onDragStart={(e) => handleDragStart(e, task._id || task.id)}
-                              className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2.5 group relative"
+                              className="bg-white rounded-xl sm:rounded-2xl p-3 border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing flex flex-col gap-2 group relative w-full min-w-0"
                             >
                               {/* Top Meta: ID & Kategori Badge & Edit Task */}
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70">
+                              <div className="flex items-center justify-between gap-1 flex-wrap">
+                                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70">
                                   {formatTaskId(task._id || task.id)}
                                 </span>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1">
                                   <span
-                                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                                    className={`inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full border whitespace-nowrap shrink-0 shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                                       }`}
                                   >
                                     {CATEGORY_BADGES[task.category]?.icon}
@@ -871,17 +871,17 @@ export default function Tasks() {
                               </div>
 
                               {/* Assignee Footer & Quick Status Picker */}
-                              <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100/80">
+                              <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-gray-100/80">
                                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                   <img
                                     src={assigneeInfo.avatar}
                                     alt={assigneeInfo.name}
-                                    className="w-5.5 h-5.5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
+                                    className="w-5 h-5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
                                     onError={(e) => {
                                       e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
                                     }}
                                   />
-                                  <span className="text-[11px] font-semibold text-gray-700 truncate">
+                                  <span className="text-[10.5px] font-semibold text-gray-700 truncate">
                                     {assigneeInfo.name}
                                   </span>
                                 </div>
@@ -891,7 +891,7 @@ export default function Tasks() {
                                   <select
                                     value={task.status}
                                     onChange={(e) => handleStatusChange(task._id || task.id, e.target.value)}
-                                    className="text-[10px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-2 pr-5 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors"
+                                    className="text-[9.5px] font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg pl-1.5 pr-4 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none shadow-2xs transition-colors max-w-[85px] truncate"
                                   >
                                     {STATUSES.map((s) => (
                                       <option key={s.id} value={s.id}>
@@ -900,8 +900,8 @@ export default function Tasks() {
                                     ))}
                                   </select>
                                   <FaChevronDown
-                                    size={7}
-                                    className="text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                                    size={6}
+                                    className="text-gray-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"
                                   />
                                 </div>
                               </div>
@@ -938,19 +938,19 @@ export default function Tasks() {
 
         {/* View Mode: LIST VIEW */}
         {viewMode === "list" && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[960px]">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-full">
                 <thead className="bg-gray-50/90 border-b border-gray-100 text-gray-500 font-semibold sticky top-0 z-10">
                   <tr>
-                    <th className="p-4 min-w-[200px]">ID & Judul Task</th>
-                    <th className="p-4 whitespace-nowrap min-w-[120px]">Kategori</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px]">Dibuat Oleh (PO/User)</th>
-                    <th className="p-4 whitespace-nowrap min-w-[130px]">Assignee (Penerima)</th>
-                    <th className="p-4 whitespace-nowrap min-w-[120px]">SLA / Deadline</th>
-                    <th className="p-4 whitespace-nowrap min-w-[110px] text-center">Point (SP)</th>
-                    <th className="p-4 whitespace-nowrap min-w-[120px] text-center">Status</th>
-                    <th className="p-4 whitespace-nowrap min-w-[140px] text-center">Aksi / Status</th>
+                    <th className="py-3 px-3.5">ID & Judul Task</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap">Kategori</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap">Dibuat Oleh</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap">Assignee</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap">SLA / Deadline</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap text-center">Point (SP)</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap text-center">Status</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap text-center">Aksi / Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
@@ -961,16 +961,16 @@ export default function Tasks() {
 
                     return (
                       <tr key={task._id || task.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="p-4">
-                          <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70 inline-block mb-1">
+                        <td className="py-3 px-3.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70 inline-block mb-0.5">
                             {formatTaskId(task._id || task.id)}
                           </span>
-                          <p className="font-bold text-gray-800 text-sm mt-0.5">{task.title}</p>
+                          <p className="font-bold text-gray-800 text-xs sm:text-sm">{task.title}</p>
                           <p className="text-gray-400 text-xs line-clamp-1">{task.description}</p>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
+                        <td className="py-3 px-2.5 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shadow-2xs ${CATEGORY_BADGES[task.category]?.bg || "bg-gray-50 text-gray-700 border-gray-200"
                               }`}
                           >
                             {CATEGORY_BADGES[task.category]?.icon}
@@ -978,53 +978,53 @@ export default function Tasks() {
                           </span>
                         </td>
                         {/* Dibuat Oleh */}
-                        <td className="p-4 whitespace-nowrap">
-                          <span className="font-medium text-gray-800 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 text-xs">
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <span className="font-medium text-gray-800 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 text-xs">
                             {creatorName}
                           </span>
                         </td>
                         {/* Assignee */}
-                        <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="py-3 px-2.5 font-semibold text-gray-800 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
                             <img
                               src={assigneeInfo.avatar}
                               alt={assigneeInfo.name}
-                              className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
+                              className="w-5.5 h-5.5 rounded-full object-cover ring-1 ring-gray-200 shrink-0"
                               onError={(e) => {
                                 e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(assigneeInfo.name)}&background=0284c7&color=fff&bold=true&size=64`;
                               }}
                             />
-                            <span>{assigneeInfo.name}</span>
+                            <span className="text-xs">{assigneeInfo.name}</span>
                           </div>
                         </td>
-                        <td className="p-4 whitespace-nowrap">
-                          <p className="font-medium text-gray-700">{task.deadline || "-"}</p>
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <p className="font-medium text-gray-700 text-xs">{task.deadline || "-"}</p>
                           <span className="text-[10px] text-gray-400">SLA: {task.sla || "48 Jam"}</span>
                         </td>
-                        <td className="p-4 text-center whitespace-nowrap">
+                        <td className="py-3 px-2.5 text-center whitespace-nowrap">
                           {canSetPoint ? (
                             <button
                               onClick={() => handleOpenPointModal(task)}
-                              className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-3 py-1 rounded-full border border-amber-200/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                              className="inline-flex items-center justify-center gap-1 font-bold text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
                               title="Atur Poin Task (PO / HR)"
                             >
                               <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
                             </button>
                           ) : (
-                            <span className="inline-flex items-center justify-center font-bold text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-200/60 whitespace-nowrap shadow-2xs">
+                            <span className="inline-flex items-center justify-center font-bold text-xs bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-200/60 whitespace-nowrap shadow-2xs">
                               <FaStar className="text-amber-500" size={10} /> {task.point ?? 0} SP
                             </span>
                           )}
                         </td>
-                        <td className="p-4 text-center whitespace-nowrap">
+                        <td className="py-3 px-2.5 text-center whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center justify-center text-[11px] font-semibold px-3 py-1 rounded-full border whitespace-nowrap shadow-2xs ${STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
+                            className={`inline-flex items-center justify-center text-[11px] font-semibold px-2.5 py-0.5 rounded-full border whitespace-nowrap shadow-2xs ${STATUSES.find((s) => s.id === task.status)?.color || "bg-gray-100 text-gray-700 border-gray-200"
                               }`}
                           >
                             {task.status}
                           </span>
                         </td>
-                        <td className="p-4 text-center whitespace-nowrap">
+                        <td className="py-3 px-2.5 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-2">
                             <div className="relative inline-block">
                               <select
