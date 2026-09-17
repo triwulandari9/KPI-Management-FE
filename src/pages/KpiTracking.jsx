@@ -735,18 +735,37 @@ export default function KpiTracking() {
           <span className="text-[11px] text-gray-400">Periode: {activeTab} {selectedYear} • PT. JAGA</span>
         </div>
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200/80 overflow-hidden mb-8 w-full">
-          <div className="w-full overflow-x-auto lg:overflow-x-hidden">
-            <table className="w-full text-left text-xs border-collapse table-fixed">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse table-fixed min-w-full">
+              {/* Colgroup untuk memastikan ke-15 kolom terbagi 100% pas layar tanpa terpotong */}
+              <colgroup>
+                <col style={{ width: "2.5%" }} />   {/* 1. No */}
+                <col style={{ width: "7%" }} />     {/* 2. Category */}
+                <col style={{ width: "11%" }} />    {/* 3. Strategy Objective */}
+                <col style={{ width: "10%" }} />    {/* 4. KPI Name */}
+                <col style={{ width: "14.5%" }} />  {/* 5. KPI Description & Rumus */}
+                <col style={{ width: "4.5%" }} />   {/* 6. Frequency */}
+                <col style={{ width: "4.5%" }} />   {/* 7. Bobot */}
+                <col style={{ width: "5%" }} />     {/* 8. Level 1 */}
+                <col style={{ width: "5%" }} />     {/* 9. Level 2 */}
+                <col style={{ width: "5%" }} />     {/* 10. Level 3 */}
+                <col style={{ width: "5%" }} />     {/* 11. Level 4 */}
+                <col style={{ width: "6%" }} />     {/* 12. Target */}
+                <col style={{ width: "6%" }} />     {/* 13. Actual */}
+                <col style={{ width: "5.5%" }} />   {/* 14. A/T (%) */}
+                <col style={{ width: "8.5%" }} />   {/* 15. Level Capaian */}
+              </colgroup>
+
               <thead>
                 {/* Baris 1 Header Excel */}
                 <tr className="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold">
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-center w-[3%] text-[10px]">No</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-center w-[7.5%] text-[10px]">Category</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 w-[11.5%] text-[10px]">Strategy Objective</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 w-[12%] text-[10px]">KPI Name</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 w-[17%] text-[10px]">KPI Description & Rumus</th>
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center w-[5%] text-[10px]">Frequency</th>
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center bg-blue-100 text-blue-900 w-[5%] text-[10px]">Bobot</th>
+                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">No</th>
+                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">Category</th>
+                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">Strategy Objective</th>
+                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">KPI Name</th>
+                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">KPI Description & Rumus</th>
+                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">Frequency</th>
+                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center bg-blue-100 text-blue-900 text-[10px]">Bobot</th>
                   {/* Header Level Description Ungu Gelap seperti di Excel */}
                   <th colSpan="4" className="p-1.5 text-center bg-[#581845] text-white font-bold border-r border-gray-200 text-[10.5px]">
                     Level Description
@@ -758,53 +777,53 @@ export default function KpiTracking() {
                 </tr>
 
                 {/* Baris 2 Header Sub-Kolom Level & Nilai */}
-                <tr className="border-b border-gray-200 text-[10px]">
+                <tr className="border-b border-gray-200 text-[9.5px]">
                   {/* Sub-Header Level 1 - 4 */}
-                  <th className="p-1 text-center bg-[#7B241C]/90 text-white border-r border-white/20 w-[5%] text-[9.5px]">Level 1</th>
-                  <th className="p-1 text-center bg-[#7B241C]/80 text-white border-r border-white/20 w-[5%] text-[9.5px]">Level 2</th>
-                  <th className="p-1 text-center bg-[#7B241C]/70 text-white border-r border-white/20 w-[5%] text-[9.5px]">Level 3</th>
-                  <th className="p-1 text-center bg-[#7B241C]/60 text-white border-r border-gray-300 w-[5%] text-[9.5px]">Level 4</th>
+                  <th className="p-1 text-center bg-[#7B241C]/90 text-white border-r border-white/20">Level 1</th>
+                  <th className="p-1 text-center bg-[#7B241C]/80 text-white border-r border-white/20">Level 2</th>
+                  <th className="p-1 text-center bg-[#7B241C]/70 text-white border-r border-white/20">Level 3</th>
+                  <th className="p-1 text-center bg-[#7B241C]/60 text-white border-r border-gray-300">Level 4</th>
 
                   {/* Sub-Header Target, Actual, A/T, Level Capaian */}
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200 w-[6%] text-[9.5px]">Target</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200 w-[6%] text-[9.5px]">Actual</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200 w-[5%] text-[9.5px]">A/T (%)</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 font-bold w-[7%] text-[9.5px]">Level</th>
+                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">Target</th>
+                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">Actual</th>
+                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">A/T (%)</th>
+                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 font-bold">Level</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-200 text-gray-800 text-[10.5px]">
+              <tbody className="divide-y divide-gray-200 text-gray-800 text-[10px]">
                 {computedMetrics.map((kpi) => (
                   <tr key={kpi.no} id={`kpi-${kpi.no}`} className="hover:bg-blue-50/30 transition-colors duration-200">
                     {/* No */}
-                    <td className="p-1.5 border-r border-gray-200 text-center font-bold text-gray-500 text-[10px]">
+                    <td className="p-1 border-r border-gray-200 text-center font-bold text-gray-500 text-[10px]">
                       {kpi.no}
                     </td>
 
                     {/* Category Badge */}
                     <td className="p-1 border-r border-gray-200 text-center">
-                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold border leading-tight text-center whitespace-normal break-words ${kpi.categoryBg}`}>
+                      <span className={`inline-block px-1 py-0.5 rounded text-[8.5px] font-bold border leading-tight text-center whitespace-normal break-words ${kpi.categoryBg}`}>
                         {kpi.category}
                       </span>
                     </td>
 
                     {/* Strategy Objective */}
-                    <td className="p-1.5 border-r border-gray-200 font-medium text-gray-700 text-[10px] leading-snug break-words">
+                    <td className="p-1.5 border-r border-gray-200 font-medium text-gray-700 text-[9.5px] leading-snug break-words hyphens-auto">
                       {kpi.objective}
                     </td>
 
                     {/* KPI Name */}
-                    <td className="p-1.5 border-r border-gray-200 font-bold text-gray-900 text-[10.5px] leading-snug break-words">
+                    <td className="p-1.5 border-r border-gray-200 font-bold text-gray-900 text-[10px] leading-snug break-words">
                       {kpi.kpiName}
                     </td>
 
                     {/* Description Murni */}
-                    <td className="p-1.5 border-r border-gray-200 text-gray-600 leading-snug text-[9.5px] break-words">
+                    <td className="p-1.5 border-r border-gray-200 text-gray-600 leading-snug text-[9px] break-words">
                       {kpi.description}
                     </td>
 
                     {/* Frequency */}
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 font-medium text-[10px]">
+                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 font-medium text-[9.5px]">
                       {kpi.frequency}
                     </td>
 
@@ -814,34 +833,34 @@ export default function KpiTracking() {
                     </td>
 
                     {/* Level Description 1 - 4 */}
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-500 bg-gray-50/40 text-[9.5px] leading-tight break-words">
+                    <td className="p-1 border-r border-gray-200 text-center text-gray-500 bg-gray-50/40 text-[9px] leading-tight break-words">
                       {kpi.levels.l1}
                     </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 bg-gray-50/40 text-[9.5px] leading-tight break-words">
+                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 bg-gray-50/40 text-[9px] leading-tight break-words">
                       {kpi.levels.l2}
                     </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-700 bg-gray-50/40 font-medium text-[9.5px] leading-tight break-words">
+                    <td className="p-1 border-r border-gray-200 text-center text-gray-700 bg-gray-50/40 font-medium text-[9px] leading-tight break-words">
                       {kpi.levels.l3}
                     </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-emerald-700 bg-emerald-50/30 font-bold text-[9.5px] leading-tight break-words">
+                    <td className="p-1 border-r border-gray-200 text-center text-emerald-700 bg-emerald-50/30 font-bold text-[9px] leading-tight break-words">
                       {kpi.levels.l4}
                     </td>
 
                     {/* Target & Actual */}
-                    <td className="p-1 border-r border-gray-200 text-center font-semibold text-gray-700 text-[10px] break-words">
+                    <td className="p-1 border-r border-gray-200 text-center font-semibold text-gray-700 text-[9.5px] break-words">
                       {kpi.monthlyTarget}
                     </td>
-                    <td className="p-1 border-r border-gray-200 text-center font-extrabold text-gray-900 bg-emerald-50/20 text-[10px] break-words">
+                    <td className="p-1 border-r border-gray-200 text-center font-extrabold text-gray-900 bg-emerald-50/20 text-[9.5px] break-words">
                       {kpi.actual}
                     </td>
-                    <td className="p-1 border-r border-gray-200 text-center font-bold text-primary text-[10px]">
+                    <td className="p-1 border-r border-gray-200 text-center font-bold text-primary text-[9.5px]">
                       {kpi.atPercent}
                     </td>
 
                     {/* Capaian Level Badge */}
                     <td className="p-1 text-center">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full font-bold text-[10px] shadow-2xs whitespace-nowrap ${kpi.achievedLevel === 4
+                        className={`inline-block px-1.5 py-0.5 rounded-full font-bold text-[9px] shadow-2xs whitespace-nowrap ${kpi.achievedLevel === 4
                             ? "bg-green-100 text-green-700 border border-green-300"
                             : kpi.achievedLevel === 3
                               ? "bg-blue-100 text-blue-700 border border-blue-300"
