@@ -265,10 +265,10 @@ export default function Tasks() {
     return isTaskCreator(task) || isTaskAssignee(task);
   };
 
-  // Rule Manajemen Task (Edit & Hapus):
-  // Fitur edit dan hapus task HANYA muncul untuk si pembuat task (atau PO/HR)
-  // Penerima task yang bukan pembuat hanya dapat melihat dan memindahkan alur task
-  const canModifyTask = (task) => {
+  // Rule Manajemen Task:
+  // - Edit: bisa dilakukan oleh semua pengguna yang memiliki akses ke task
+  // - Hapus: HANYA bisa dilakukan oleh si pembuat task (atau PO/HR)
+  const canDeleteTask = (task) => {
     if (!task) return false;
     return isTaskCreator(task) || isPO || isHR;
   };
@@ -526,7 +526,7 @@ export default function Tasks() {
 
   // Hapus Task: Panggil API delete -> refresh task dari API -> tutup modal konfirmasi
   const handleDeleteTask = async () => {
-    if (!taskToDelete) return;
+    if (!taskToDelete || !canDeleteTask(taskToDelete)) return;
     const taskId = taskToDelete._id || taskToDelete.id;
     setIsDeleting(true);
 
@@ -834,19 +834,19 @@ export default function Tasks() {
                                       {CATEGORY_BADGES[task.category]?.icon}
                                       {CATEGORY_BADGES[task.category]?.label || task.category}
                                     </span>
-                                    {canModifyTask(task) && (
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenEditModal(task);
-                                          }}
-                                          className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-                                          title="Edit Task (Khusus Pembuat Task)"
-                                        >
-                                          <FaEdit size={11} />
-                                        </button>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditModal(task);
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                                        title="Edit Task"
+                                      >
+                                        <FaEdit size={11} />
+                                      </button>
+                                      {canDeleteTask(task) && (
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -858,8 +858,8 @@ export default function Tasks() {
                                         >
                                           <FaTrashAlt size={11} />
                                         </button>
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
@@ -1091,16 +1091,16 @@ export default function Tasks() {
                                 className="text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
                               />
                             </div>
-                            {canModifyTask(task) && (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(task)}
-                                  className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary-light/20 rounded-lg border border-gray-200 transition-colors cursor-pointer"
-                                  title="Edit Task (Khusus Pembuat Task)"
-                                >
-                                  <FaEdit size={12} />
-                                </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(task)}
+                                className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary-light/20 rounded-lg border border-gray-200 transition-colors cursor-pointer"
+                                title="Edit Task"
+                              >
+                                <FaEdit size={12} />
+                              </button>
+                              {canDeleteTask(task) && (
                                 <button
                                   type="button"
                                   onClick={() => setTaskToDelete(task)}
@@ -1109,8 +1109,8 @@ export default function Tasks() {
                                 >
                                   <FaTrashAlt size={12} />
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1405,7 +1405,7 @@ export default function Tasks() {
 
                 {/* Footer Buttons */}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  {canModifyTask(editingTask) ? (
+                  {canDeleteTask(editingTask) ? (
                     <button
                       type="button"
                       onClick={() => {
