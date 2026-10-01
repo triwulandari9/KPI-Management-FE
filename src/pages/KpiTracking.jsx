@@ -418,118 +418,149 @@ export default function KpiTracking() {
 
   // Unduh File Excel (.xlsx) Multi-Sheet (1 Sheet per Karyawan)
   const handleDownloadExcel = () => {
-    const wb = XLSX.utils.book_new();
-    const listToExport = employeesList;
+    try {
+      const wb = XLSX.utils.book_new();
+      
+      // Selalu ekspor SEMUA karyawan (1 Sheet/Halaman per Karyawan di dalam 1 file Excel)
+      const listToExport =
+        Array.isArray(employeesList) && employeesList.length > 0
+          ? employeesList
+          : Array.isArray(EMPLOYEES) && EMPLOYEES.length > 0
+          ? EMPLOYEES
+          : [currentEmployee || { name: currentUser?.name || "Karyawan", role: currentUser?.role || "Staff" }];
 
-    listToExport.forEach((emp) => {
-      // Baris Header Laporan Resmi PT. JAGA
-      const sheetData = [
-        ["LAPORAN EVALUASI KEY PERFORMANCE INDICATOR (KPI)"],
-        [`PT. JAGA • TAHUN EVALUASI ${selectedYear}`],
-        [""],
-        [
-          "Nama Karyawan:",
-          emp.name,
-          "",
-          "Jabatan / Divisi:",
-          emp.role,
-          "",
-          "Periode Evaluasi:",
-          `${activeTab} ${selectedYear}`,
-        ],
-        [""],
-        [
-          "No",
-          "Category",
-          "Strategy Objective",
-          "KPI Name",
-          "KPI Description & Rumus",
-          "Frequency",
-          "Bobot (%)",
-          "Level 1",
-          "Level 2",
-          "Level 3",
-          "Level 4",
-          "Monthly Target",
-          "Actual",
-          "A/T (%)",
-          "Achieved Level",
-        ],
-      ];
+      const usedSheetNames = new Set();
 
-      // Baris Data KPI untuk Karyawan Ini
-      computedMetrics.forEach((k) => {
+      listToExport.forEach((emp, index) => {
+        const empName = emp?.name || emp?.fullName || emp?.username || `Karyawan ${index + 1}`;
+        const empRole = emp?.role || emp?.position || emp?.jobTitle || "-";
+
+        // Baris Header Laporan Resmi PT. JAGA
+        const sheetData = [
+          ["LAPORAN EVALUASI KEY PERFORMANCE INDICATOR (KPI)"],
+          [`PT. JAGA • TAHUN EVALUASI ${selectedYear}`],
+          [""],
+          [
+            "Nama Karyawan:",
+            empName,
+            "",
+            "Jabatan / Divisi:",
+            empRole,
+            "",
+            "Periode Evaluasi:",
+            `${activeTab} ${selectedYear}`,
+          ],
+          [""],
+          [
+            "No",
+            "Category",
+            "Strategy Objective",
+            "KPI Name",
+            "KPI Description & Rumus",
+            "Frequency",
+            "Bobot (%)",
+            "Level 1",
+            "Level 2",
+            "Level 3",
+            "Level 4",
+            "Monthly Target",
+            "Actual",
+            "A/T (%)",
+            "Achieved Level",
+          ],
+        ];
+
+        // Baris Data KPI untuk Karyawan Ini
+        computedMetrics.forEach((k) => {
+          sheetData.push([
+            k.no,
+            k.category,
+            k.objective,
+            k.kpiName,
+            k.description,
+            k.frequency,
+            `${k.weight}%`,
+            k.levels?.l1 || "-",
+            k.levels?.l2 || "-",
+            k.levels?.l3 || "-",
+            k.levels?.l4 || "-",
+            k.monthlyTarget || "-",
+            k.actual || "-",
+            k.atPercent || "-",
+            `Level ${k.achievedLevel || 1}`,
+          ]);
+        });
+
+        // Baris Total Bobot & Ringkasan
+        sheetData.push([""]);
         sheetData.push([
-          k.no,
-          k.category,
-          k.objective,
-          k.kpiName,
-          k.description,
-          k.frequency,
-          `${k.weight}%`,
-          k.levels.l1,
-          k.levels.l2,
-          k.levels.l3,
-          k.levels.l4,
-          k.monthlyTarget,
-          k.actual,
-          k.atPercent,
-          `Level ${k.achievedLevel}`,
+          "TOTAL BOBOT:",
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${totalWeight}%`,
+          "",
+          "",
+          "",
+          "",
+          "Rata-rata Capaian:",
+          `Level ${avgLevel}`,
+          "",
+          "Sangat Baik",
         ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+        // Konfigurasi Lebar Kolom yang Rapi
+        ws["!cols"] = [
+          { wch: 6 },  // No
+          { wch: 24 }, // Category
+          { wch: 34 }, // Strategy Objective
+          { wch: 30 }, // KPI Name
+          { wch: 50 }, // KPI Description & Rumus
+          { wch: 12 }, // Frequency
+          { wch: 12 }, // Bobot
+          { wch: 14 }, // Level 1
+          { wch: 14 }, // Level 2
+          { wch: 14 }, // Level 3
+          { wch: 14 }, // Level 4
+          { wch: 16 }, // Monthly Target
+          { wch: 14 }, // Actual
+          { wch: 12 }, // A/T (%)
+          { wch: 16 }, // Achieved Level
+        ];
+
+        // Nama sheet bersih (Maksimal 31 karakter & karakter dilarang Excel dihilangkan)
+        let cleanSheetName = String(empName).replace(/[:\\/?*[\]]/g, "").trim() || `Karyawan_${index + 1}`;
+        cleanSheetName = cleanSheetName.substring(0, 28);
+        
+        // Mencegah duplikasi nama sheet di Excel
+        let finalSheetName = cleanSheetName;
+        let counter = 1;
+        while (usedSheetNames.has(finalSheetName.toLowerCase())) {
+          finalSheetName = `${cleanSheetName.substring(0, 25)}_${counter}`;
+          counter++;
+        }
+        usedSheetNames.add(finalSheetName.toLowerCase());
+
+        XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
       });
 
-      // Baris Total Bobot & Ringkasan
-      sheetData.push([""]);
-      sheetData.push([
-        "TOTAL BOBOT:",
-        "",
-        "",
-        "",
-        "",
-        "",
-        `${totalWeight}%`,
-        "",
-        "",
-        "",
-        "",
-        "Rata-rata Capaian:",
-        `Level ${avgLevel}`,
-        "",
-        "Sangat Baik",
-      ]);
+      // Tulis dan unduh file .xlsx langsung ke browser (Semua Karyawan dalam 1 file, beda sheet)
+      const fileName = `Laporan_KPI_Semua_Karyawan_${activeTab}_${selectedYear}.xlsx`;
 
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-      // Konfigurasi Lebar Kolom yang Rapi
-      ws["!cols"] = [
-        { wch: 6 },  // No
-        { wch: 24 }, // Category
-        { wch: 34 }, // Strategy Objective
-        { wch: 30 }, // KPI Name
-        { wch: 50 }, // KPI Description & Rumus
-        { wch: 12 }, // Frequency
-        { wch: 12 }, // Bobot
-        { wch: 14 }, // Level 1
-        { wch: 14 }, // Level 2
-        { wch: 14 }, // Level 3
-        { wch: 14 }, // Level 4
-        { wch: 16 }, // Monthly Target
-        { wch: 14 }, // Actual
-        { wch: 12 }, // A/T (%)
-        { wch: 16 }, // Achieved Level
-      ];
-
-      // Nama sheet bersih (Maksimal 31 karakter sesuai batas Excel)
-      const cleanSheetName = emp.name.replace(/[:\\/?*[\]]/g, "").substring(0, 31);
-      XLSX.utils.book_append_sheet(wb, ws, cleanSheetName);
-    });
-
-    // Tulis dan unduh file .xlsx langsung ke browser
-    XLSX.writeFile(wb, `Laporan_KPI_Semua_Karyawan_${activeTab}_${selectedYear}.xlsx`);
-    setExportNotification(
-      `File Excel (.xlsx) Laporan KPI Semua Karyawan (1 Sheet per Karyawan) Periode ${activeTab} ${selectedYear} berhasil diunduh!`
-    );
-    setTimeout(() => setExportNotification(false), 4000);
+      XLSX.writeFile(wb, fileName);
+      setExportNotification(
+        `File Excel (.xlsx) Laporan KPI Semua Karyawan (${listToExport.length} Sheet) Periode ${activeTab} ${selectedYear} berhasil diunduh!`
+      );
+      setTimeout(() => setExportNotification(false), 4000);
+    } catch (err) {
+      console.error("Gagal export excel:", err);
+      setExportNotification(`Gagal mengunduh file Excel: ${err?.message || "Terjadi kesalahan sistem"}`);
+      setTimeout(() => setExportNotification(false), 5000);
+    }
   };
 
   return (
@@ -552,16 +583,14 @@ export default function KpiTracking() {
               <FaEdit /> Input Capaian KPI
             </button>
 
-            {/* Tombol Export Excel Khusus HR (Multi-Sheet Semua Karyawan) */}
-            {isHR && (
-              <button
-                onClick={handleDownloadExcel}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
-                title="Unduh 1 file Excel berisi semua sheet data KPI karyawan"
-              >
-                <FaFileExcel /> Export Excel
-              </button>
-            )}
+            {/* Tombol Export Excel */}
+            <button
+              onClick={handleDownloadExcel}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              title={isHR ? "Unduh file Excel berisi semua sheet data KPI karyawan" : "Unduh file Excel laporan KPI"}
+            >
+              <FaFileExcel /> Export Excel
+            </button>
           </div>
         </PageHeader>
 
