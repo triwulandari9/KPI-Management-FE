@@ -400,22 +400,39 @@ export default function CalendarPage() {
     });
   };
 
+  // Hitung jumlah tugas yang BENAR-BENAR aktif/jatuh pada bulan dan tahun yang sedang dipilih
+  const tasksInSelectedMonth = useMemo(() => {
+    return filteredTasks.filter((t) => {
+      const start = t.startDate ? new Date(t.startDate) : null;
+      const deadline = t.deadlineDate ? new Date(t.deadlineDate) : null;
+
+      // Cek apakah tanggal deadline jatuh di bulan & tahun terpilih
+      if (deadline && deadline.getMonth() === currentMonth && deadline.getFullYear() === currentYear) {
+        return true;
+      }
+      // Cek apakah tanggal start jatuh di bulan & tahun terpilih
+      if (start && start.getMonth() === currentMonth && start.getFullYear() === currentYear) {
+        return true;
+      }
+      // Cek apakah rentang pengerjaan mencakup bulan terpilih
+      if (start && deadline) {
+        const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+        if (start <= lastDayOfMonth && deadline >= firstDayOfMonth) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [filteredTasks, currentMonth, currentYear]);
+
   // Filter khusus untuk mode List (Apakah hanya bulan terpilih atau semua riwayat)
   const listTasks = useMemo(() => {
     if (listScope === "all") {
       return filteredTasks;
     }
-    // Hanya task yang jatuh di bulan & tahun yang sedang dipilih
-    return filteredTasks.filter((t) => {
-      if (t.deadlineDate) {
-        if (t.deadlineDate.getMonth() === currentMonth && t.deadlineDate.getFullYear() === currentYear) return true;
-      }
-      if (t.startDate) {
-        if (t.startDate.getMonth() === currentMonth && t.startDate.getFullYear() === currentYear) return true;
-      }
-      return false;
-    });
-  }, [filteredTasks, listScope, currentMonth, currentYear]);
+    return tasksInSelectedMonth;
+  }, [filteredTasks, listScope, tasksInSelectedMonth]);
 
   return (
     <div className="bg-gray-50 min-h-screen lg:h-screen lg:overflow-hidden flex flex-col">
@@ -429,20 +446,21 @@ export default function CalendarPage() {
       >
         {/* Header Kalender & Filter Toolbar */}
         <div className="shrink-0 flex flex-col gap-3 mb-3 sm:mb-4">
-          {/* Baris 1: Judul + Pemilih Bulan & Tahun Langsung + Navigasi */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
-            {/* Bagian Kiri: Title & Selector Bulan & Tahun */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                  Kalender & Jadwal Tugas
+          {/* Baris 1: Judul + Pemilih Bulan & Tahun Rapi + Navigasi */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-gray-200/80 shadow-2xs">
+            {/* Bagian Kiri: Title & Selector Bulan & Tahun yang Proporsional */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-primary-light text-primary hidden sm:inline-flex">
+                  <FaCalendarAlt size={16} />
                 </span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {/* Dropdown Pilihan Bulan */}
+
+                {/* Dropdown Pilihan Bulan (Font rapi & proporsional) */}
+                <div className="relative">
                   <select
                     value={currentMonth}
                     onChange={handleMonthChange}
-                    className="text-lg sm:text-xl font-extrabold text-gray-900 bg-transparent border-b-2 border-primary/40 hover:border-primary focus:outline-none focus:border-primary cursor-pointer py-0.5 pr-2 tracking-tight transition-colors"
+                    className="text-sm sm:text-base font-bold text-gray-900 bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded-xl px-3 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer transition-all shadow-2xs appearance-none"
                   >
                     {MONTH_NAMES.map((name, idx) => (
                       <option key={idx} value={idx}>
@@ -450,12 +468,15 @@ export default function CalendarPage() {
                       </option>
                     ))}
                   </select>
+                  <FaChevronLeft className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none -rotate-90 text-[10px]" />
+                </div>
 
-                  {/* Dropdown Pilihan Tahun */}
+                {/* Dropdown Pilihan Tahun */}
+                <div className="relative">
                   <select
                     value={currentYear}
                     onChange={handleYearChange}
-                    className="text-lg sm:text-xl font-extrabold text-primary bg-primary-light/50 hover:bg-primary-light border border-primary/20 rounded-xl px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer transition-all"
+                    className="text-sm sm:text-base font-bold text-primary bg-primary-light/60 hover:bg-primary-light border border-primary/20 rounded-xl px-3 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer transition-all shadow-2xs appearance-none"
                   >
                     {yearOptions.map((yr) => (
                       <option key={yr} value={yr}>
@@ -463,14 +484,19 @@ export default function CalendarPage() {
                       </option>
                     ))}
                   </select>
-
-                  {/* Badge Total Tugas */}
-                  <span className="text-xs px-2.5 py-0.5 font-bold rounded-full bg-primary-light text-primary border border-primary/20 shrink-0">
-                    {filteredTasks.length} Tugas
-                  </span>
-
-                  {isLoading && <FaSpinner className="animate-spin text-primary text-xs shrink-0" />}
+                  <FaChevronLeft className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary/70 pointer-events-none -rotate-90 text-[10px]" />
                 </div>
+
+                {/* Badge Total Tugas Dinamis Sesuai Bulan yang Dipilih */}
+                <span className={`text-xs px-2.5 py-1 font-bold rounded-xl border transition-all ${
+                  tasksInSelectedMonth.length > 0
+                    ? "bg-primary-light text-primary border-primary/20"
+                    : "bg-gray-100 text-gray-500 border-gray-200"
+                }`}>
+                  {tasksInSelectedMonth.length} Tugas
+                </span>
+
+                {isLoading && <FaSpinner className="animate-spin text-primary text-xs shrink-0" />}
               </div>
             </div>
 
