@@ -92,7 +92,6 @@ export default function CalendarPage() {
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [displayMode, setDisplayMode] = useState("range"); // "range" (start s/d deadline) | "deadline" (hanya deadline)
   const [listScope, setListScope] = useState("month"); // "month" (hanya bulan terpilih) | "all" (semua riwayat tugas)
 
   // Data States
@@ -369,60 +368,25 @@ export default function CalendarPage() {
     });
   }
 
-  // Mengecek apakah suatu task jatuh pada sel kalender tertentu
+  // Mengecek apakah suatu task jatuh pada sel kalender tertentu (HANYA DI HARI DEADLINE)
   const getTasksForCell = (cell) => {
     const cellDate = new Date(cell.year, cell.month, cell.dayNumber);
     cellDate.setHours(0, 0, 0, 0);
 
     return filteredTasks.filter((task) => {
       const deadline = task.deadlineDate ? new Date(task.deadlineDate) : null;
-      if (deadline) deadline.setHours(0, 0, 0, 0);
-
-      const start = task.startDate ? new Date(task.startDate) : null;
-      if (start) start.setHours(0, 0, 0, 0);
-
-      // Mode: Hanya Deadline
-      if (displayMode === "deadline") {
-        if (!deadline) return false;
-        return deadline.getTime() === cellDate.getTime();
-      }
-
-      // Mode: Rentang Pengerjaan (Start s/d Deadline)
-      if (start && deadline) {
-        return cellDate.getTime() >= start.getTime() && cellDate.getTime() <= deadline.getTime();
-      } else if (deadline) {
-        return deadline.getTime() === cellDate.getTime();
-      } else if (start) {
-        return start.getTime() === cellDate.getTime();
-      }
-
-      return false;
+      if (!deadline) return false;
+      deadline.setHours(0, 0, 0, 0);
+      return deadline.getTime() === cellDate.getTime();
     });
   };
 
-  // Hitung jumlah tugas yang BENAR-BENAR aktif/jatuh pada bulan dan tahun yang sedang dipilih
+  // Hitung jumlah tugas yang jatuh pada bulan dan tahun yang sedang dipilih (berdasarkan deadline)
   const tasksInSelectedMonth = useMemo(() => {
     return filteredTasks.filter((t) => {
-      const start = t.startDate ? new Date(t.startDate) : null;
       const deadline = t.deadlineDate ? new Date(t.deadlineDate) : null;
-
-      // Cek apakah tanggal deadline jatuh di bulan & tahun terpilih
-      if (deadline && deadline.getMonth() === currentMonth && deadline.getFullYear() === currentYear) {
-        return true;
-      }
-      // Cek apakah tanggal start jatuh di bulan & tahun terpilih
-      if (start && start.getMonth() === currentMonth && start.getFullYear() === currentYear) {
-        return true;
-      }
-      // Cek apakah rentang pengerjaan mencakup bulan terpilih
-      if (start && deadline) {
-        const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-        if (start <= lastDayOfMonth && deadline >= firstDayOfMonth) {
-          return true;
-        }
-      }
-      return false;
+      if (!deadline) return false;
+      return deadline.getMonth() === currentMonth && deadline.getFullYear() === currentYear;
     });
   }, [filteredTasks, currentMonth, currentYear]);
 
@@ -564,28 +528,6 @@ export default function CalendarPage() {
                 Tugas Saya
               </button>
 
-              {/* Toggle Tipe Tanggal: Rentang vs Deadline */}
-              <div className="hidden sm:flex items-center bg-white border border-gray-200 rounded-xl p-0.5 text-xs font-medium shadow-2xs text-gray-600">
-                <button
-                  onClick={() => setDisplayMode("range")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
-                    displayMode === "range" ? "bg-accent-light text-accent font-bold" : "hover:text-gray-900"
-                  }`}
-                  title="Tampilkan tugas sepanjang durasi pengerjaan (Mulai s/d Deadline)"
-                >
-                  Rentang Pengerjaan
-                </button>
-                <button
-                  onClick={() => setDisplayMode("deadline")}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
-                    displayMode === "deadline" ? "bg-accent-light text-accent font-bold" : "hover:text-gray-900"
-                  }`}
-                  title="Hanya tampilkan di tanggal deadline saja"
-                >
-                  Hanya Deadline
-                </button>
-              </div>
-
               {/* Toggle Scope pada List View: Bulan Ini vs Semua Riwayat */}
               {viewType === "List" && (
                 <div className="flex items-center bg-white border border-gray-200 rounded-xl p-0.5 text-xs font-medium shadow-2xs text-gray-600">
@@ -718,14 +660,10 @@ export default function CalendarPage() {
                         </span>
                       </div>
 
-                      {/* Daftar Badge Task di Tanggal Ini */}
+                      {/* Daftar Badge Task di Tanggal Deadline Ini */}
                       <div className="flex flex-col gap-1 overflow-hidden my-auto">
                         {visibleTasks.map((t) => {
                           const catConf = CATEGORY_CONFIG[t.category] || CATEGORY_CONFIG.Feature;
-                          const isDeadlineDay =
-                            t.deadlineDate &&
-                            t.deadlineDate.getDate() === cell.dayNumber &&
-                            t.deadlineDate.getMonth() === cell.month;
 
                           return (
                             <button
@@ -736,11 +674,6 @@ export default function CalendarPage() {
                             >
                               {catConf.icon}
                               <span className="truncate flex-1">{t.title}</span>
-                              {isDeadlineDay && (
-                                <span className="text-[8px] font-bold px-1 rounded bg-rose-100 text-rose-700 shrink-0">
-                                  DL
-                                </span>
-                              )}
                             </button>
                           );
                         })}
