@@ -329,99 +329,125 @@ export default function KpiTracking() {
   };
 
 
-  const computedMetrics = KPI_METRICS_TEMPLATE.map((kpi) => {
-    let actual = "";
-    let atPercent = "";
-    let achievedLevel = 4;
-    const inp = kpiInputs[kpi.no] || {};
+  // Helper untuk menghitung metrik KPI dari kumpulan input tertentu
+  const calculateMetricsForInputs = (inputs) => {
+    const metrics = KPI_METRICS_TEMPLATE.map((kpi) => {
+      let actual = "";
+      let atPercent = "";
+      let achievedLevel = 4;
+      const inp = inputs[kpi.no] || {};
 
-    switch (kpi.no) {
-      case 1: {
-        const onTime = Number(inp.onTime) || 0;
-        const total = Number(inp.total) || 1;
-        const percent = total > 0 ? (onTime / total) * 100 : 0;
-        actual = `${percent.toFixed(1)}%`;
-        atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
-        achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 80 ? 2 : 1;
-        break;
+      switch (kpi.no) {
+        case 1: {
+          const onTime = Number(inp.onTime) || 0;
+          const total = Number(inp.total) || 1;
+          const percent = total > 0 ? (onTime / total) * 100 : 0;
+          actual = `${percent.toFixed(1)}%`;
+          atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
+          achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 80 ? 2 : 1;
+          break;
+        }
+        case 2: {
+          const onSla = Number(inp.onSla) || 0;
+          const total = Number(inp.total) || 1;
+          const percent = total > 0 ? (onSla / total) * 100 : 0;
+          actual = `${percent.toFixed(1)}%`;
+          atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
+          achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 85 ? 2 : 1;
+          break;
+        }
+        case 3: {
+          const bug = Number(inp.bugCount) || 0;
+          actual = `${bug} Bug`;
+          atPercent = bug === 0 ? "100.0%" : `${Math.max(0, 100 - (bug / 5) * 20).toFixed(1)}%`;
+          achievedLevel = bug === 0 ? 4 : bug <= 5 ? 3 : bug <= 10 ? 2 : 1;
+          break;
+        }
+        case 4: {
+          const count = Number(inp.count) || 0;
+          actual = `${count} Item`;
+          atPercent = `${((count / 2) * 100).toFixed(1)}%`;
+          achievedLevel = count >= 3 ? 4 : count >= 2 ? 3 : count >= 1 ? 2 : 1;
+          break;
+        }
+        case 5: {
+          const done = Number(inp.done) || 0;
+          const total = Number(inp.total) || 0;
+          const percent = total === 0 && done === 0 ? 100 : total > 0 ? (done / total) * 100 : 0;
+          actual = `${percent.toFixed(1)}%`;
+          atPercent = `${((percent / 60) * 100).toFixed(1)}%`;
+          achievedLevel = percent >= 80 ? 4 : percent >= 60 ? 3 : percent >= 40 ? 2 : 1;
+          break;
+        }
+        case 6: {
+          const hrs = Number(inp.hours) || 0;
+          actual = `${hrs} Jam`;
+          atPercent = hrs > 0 ? `${((48 / hrs) * 100).toFixed(1)}%` : "100.0%";
+          achievedLevel = hrs < 48 ? 4 : hrs === 48 ? 3 : hrs <= 64 ? 2 : 1;
+          break;
+        }
+        case 7: {
+          const rej = Number(inp.rejectCount) || 0;
+          const total = Number(inp.totalTasks) || 1;
+          const percent = total > 0 ? (rej / total) * 100 : 0;
+          actual = `${percent.toFixed(1)}%`;
+          atPercent = percent <= 20 ? "100.0%" : `${((30 / Math.max(percent, 1)) * 100).toFixed(1)}%`;
+          achievedLevel = percent < 20 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
+          break;
+        }
+        case 8: {
+          const sp = Number(inp.spEarned) || 0;
+          const target = Number(inp.spTarget) || 88;
+          const percent = target > 0 ? (sp / target) * 100 : 0;
+          actual = `${sp} SP`;
+          atPercent = `${percent.toFixed(1)}%`;
+          achievedLevel = sp >= 120 ? 4 : sp >= 88 ? 3 : sp >= 56 ? 2 : 1;
+          break;
+        }
+        default:
+          break;
       }
-      case 2: {
-        const onSla = Number(inp.onSla) || 0;
-        const total = Number(inp.total) || 1;
-        const percent = total > 0 ? (onSla / total) * 100 : 0;
-        actual = `${percent.toFixed(1)}%`;
-        atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
-        achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 85 ? 2 : 1;
-        break;
-      }
-      case 3: {
-        const bug = Number(inp.bugCount) || 0;
-        actual = `${bug} Bug`;
-        atPercent = bug === 0 ? "100.0%" : `${Math.max(0, 100 - (bug / 5) * 20).toFixed(1)}%`;
-        achievedLevel = bug === 0 ? 4 : bug <= 5 ? 3 : bug <= 10 ? 2 : 1;
-        break;
-      }
-      case 4: {
-        const count = Number(inp.count) || 0;
-        actual = `${count} Item`;
-        atPercent = `${((count / 2) * 100).toFixed(1)}%`;
-        achievedLevel = count >= 3 ? 4 : count >= 2 ? 3 : count >= 1 ? 2 : 1;
-        break;
-      }
-      case 5: {
-        const done = Number(inp.done) || 0;
-        const total = Number(inp.total) || 0;
-        const percent = total === 0 && done === 0 ? 100 : total > 0 ? (done / total) * 100 : 0;
-        actual = `${percent.toFixed(1)}%`;
-        atPercent = `${((percent / 60) * 100).toFixed(1)}%`;
-        achievedLevel = percent >= 80 ? 4 : percent >= 60 ? 3 : percent >= 40 ? 2 : 1;
-        break;
-      }
-      case 6: {
-        const hrs = Number(inp.hours) || 0;
-        actual = `${hrs} Jam`;
-        atPercent = hrs > 0 ? `${((48 / hrs) * 100).toFixed(1)}%` : "100.0%";
-        achievedLevel = hrs < 48 ? 4 : hrs === 48 ? 3 : hrs <= 64 ? 2 : 1;
-        break;
-      }
-      case 7: {
-        const rej = Number(inp.rejectCount) || 0;
-        const total = Number(inp.totalTasks) || 1;
-        const percent = total > 0 ? (rej / total) * 100 : 0;
-        actual = `${percent.toFixed(1)}%`;
-        atPercent = percent <= 20 ? "100.0%" : `${((30 / Math.max(percent, 1)) * 100).toFixed(1)}%`;
-        achievedLevel = percent < 20 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
-        break;
-      }
-      case 8: {
-        const sp = Number(inp.spEarned) || 0;
-        const target = Number(inp.spTarget) || 88;
-        const percent = target > 0 ? (sp / target) * 100 : 0;
-        actual = `${sp} SP`;
-        atPercent = `${percent.toFixed(1)}%`;
-        achievedLevel = sp >= 120 ? 4 : sp >= 88 ? 3 : sp >= 56 ? 2 : 1;
-        break;
-      }
-      default:
-        break;
-    }
 
-    return { ...kpi, actual, atPercent, achievedLevel };
-  });
+      return { ...kpi, actual, atPercent, achievedLevel };
+    });
 
-  // Hitung Skor Rata-rata & Level Dominan
+    const weightSum = metrics.reduce((acc, curr) => acc + curr.weight, 0);
+    const averageLevel = (
+      metrics.reduce((acc, curr) => acc + curr.achievedLevel, 0) / metrics.length
+    ).toFixed(1);
+
+    let predicate = "Sangat Baik (A)";
+    const numAvg = parseFloat(averageLevel);
+    if (numAvg >= 3.5) predicate = "Sangat Baik (A)";
+    else if (numAvg >= 3.0) predicate = "Baik (B)";
+    else if (numAvg >= 2.0) predicate = "Cukup (C)";
+    else predicate = "Perlu Peningkatan (D)";
+
+    return { metrics, weightSum, averageLevel, predicate };
+  };
+
+  const computedMetrics = useMemo(() => {
+    return calculateMetricsForInputs(kpiInputs).metrics;
+  }, [kpiInputs]);
+
+  // Hitung Skor Rata-rata & Level Dominan untuk Karyawan yang Sedang Dipilih
   const totalWeight = computedMetrics.reduce((acc, curr) => acc + curr.weight, 0);
   const avgLevel = (
     computedMetrics.reduce((acc, curr) => acc + curr.achievedLevel, 0) / computedMetrics.length
   ).toFixed(1);
   const totalLevel4 = computedMetrics.filter((m) => m.achievedLevel === 4).length;
 
-  // Unduh File Excel (.xlsx) Multi-Sheet (1 Sheet per Karyawan)
+  // Unduh File Excel (.xlsx) Multi-Sheet Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
   const handleDownloadExcel = () => {
     try {
       const wb = XLSX.utils.book_new();
-      
-      // Selalu ekspor SEMUA karyawan (1 Sheet/Halaman per Karyawan di dalam 1 file Excel)
+      const printDateStr = new Date().toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+
+      // Daftar seluruh karyawan yang akan diekspor
       const listToExport =
         Array.isArray(employeesList) && employeesList.length > 0
           ? employeesList
@@ -430,26 +456,56 @@ export default function KpiTracking() {
           : [currentEmployee || { name: currentUser?.name || "Karyawan", role: currentUser?.role || "Staff" }];
 
       const usedSheetNames = new Set();
+      const summaryRows = [];
+
+      // =========================================================================
+      // 1. GENERATE INDIVIDUAL EMPLOYEE SHEETS & COLLECT DATA FOR SUMMARY
+      // =========================================================================
+      const employeeSheets = [];
 
       listToExport.forEach((emp, index) => {
         const empName = emp?.name || emp?.fullName || emp?.username || `Karyawan ${index + 1}`;
-        const empRole = emp?.role || emp?.position || emp?.jobTitle || "-";
+        const empId = emp?.id || emp?._id || `EMP-${String(index + 1).padStart(3, "0")}`;
+        const empRole = emp?.role || emp?.position || emp?.jobTitle || "Software Engineer";
+        const empDept = emp?.division || emp?.department || "Engineering";
 
-        // Baris Header Laporan Resmi PT. JAGA
+        // Ambil input nilai KPI karyawan dari localStorage jika ada, atau gunakan default
+        let empInputs = DEFAULT_INPUTS;
+        try {
+          const cached = localStorage.getItem(`kpi_inputs_${empId}_${monthNumber}_${selectedYear}`);
+          if (cached) {
+            empInputs = JSON.parse(cached);
+          } else if (empId === targetEmpId) {
+            empInputs = kpiInputs;
+          }
+        } catch {
+          empInputs = DEFAULT_INPUTS;
+        }
+
+        const { metrics: empMetrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(empInputs);
+
+        // Kumpulkan ke ringkasan
+        summaryRows.push([
+          index + 1,
+          empName,
+          empId,
+          empDept,
+          empRole,
+          `${weightSum}%`,
+          `Level ${averageLevel}`,
+          predicate,
+          "Terverifikasi",
+        ]);
+
+        // Struktur Sheet Detail Karyawan
         const sheetData = [
-          ["LAPORAN EVALUASI KEY PERFORMANCE INDICATOR (KPI)"],
-          [`PT. JAGA • TAHUN EVALUASI ${selectedYear}`],
+          ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
+          ["LAPORAN EVALUASI CAPAIAN KEY PERFORMANCE INDICATOR (KPI)"],
+          [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
           [""],
-          [
-            "Nama Karyawan:",
-            empName,
-            "",
-            "Jabatan / Divisi:",
-            empRole,
-            "",
-            "Periode Evaluasi:",
-            `${activeTab} ${selectedYear}`,
-          ],
+          ["INFORMASI KARYAWAN:"],
+          ["Nama Karyawan", empName, "", "ID / NIK", empId, "", "Periode", `${activeTab} ${selectedYear}`],
+          ["Jabatan / Posisi", empRole, "", "Divisi / Departemen", empDept, "", "Tanggal Cetak", printDateStr],
           [""],
           [
             "No",
@@ -459,19 +515,19 @@ export default function KpiTracking() {
             "KPI Description & Rumus",
             "Frequency",
             "Bobot (%)",
-            "Level 1",
-            "Level 2",
-            "Level 3",
-            "Level 4",
             "Monthly Target",
             "Actual",
             "A/T (%)",
             "Achieved Level",
+            "Rubrik Level 1",
+            "Rubrik Level 2",
+            "Rubrik Level 3",
+            "Rubrik Level 4",
           ],
         ];
 
-        // Baris Data KPI untuk Karyawan Ini
-        computedMetrics.forEach((k) => {
+        // Baris Data KPI Karyawan
+        empMetrics.forEach((k) => {
           sheetData.push([
             k.no,
             k.category,
@@ -480,18 +536,18 @@ export default function KpiTracking() {
             k.description,
             k.frequency,
             `${k.weight}%`,
-            k.levels?.l1 || "-",
-            k.levels?.l2 || "-",
-            k.levels?.l3 || "-",
-            k.levels?.l4 || "-",
             k.monthlyTarget || "-",
             k.actual || "-",
             k.atPercent || "-",
             `Level ${k.achievedLevel || 1}`,
+            k.levels?.l1 || "-",
+            k.levels?.l2 || "-",
+            k.levels?.l3 || "-",
+            k.levels?.l4 || "-",
           ]);
         });
 
-        // Baris Total Bobot & Ringkasan
+        // Baris Total & Predikat Evaluasi
         sheetData.push([""]);
         sheetData.push([
           "TOTAL BOBOT:",
@@ -500,62 +556,153 @@ export default function KpiTracking() {
           "",
           "",
           "",
-          `${totalWeight}%`,
+          `${weightSum}%`,
+          "",
+          "RATA-RATA LEVEL:",
+          `Level ${averageLevel} / 4.0`,
+          "",
+          "PREDIKAT EVALUASI:",
+          predicate,
+          "",
+          "",
+        ]);
+        sheetData.push([""]);
+
+        // Lembar Tanda Tangan Resmi
+        sheetData.push(["LEMBAR PENGESAHAN & PERSETUJUAN"]);
+        sheetData.push([
+          "Dibuat Oleh (Karyawan):",
+          "",
+          "",
+          "Ditinjau Oleh (Atasan Langsung):",
           "",
           "",
           "",
+          "Disetujui Oleh (HR Department):",
+        ]);
+        sheetData.push([""]);
+        sheetData.push([""]);
+        sheetData.push([
+          `(${empName})`,
           "",
-          "Rata-rata Capaian:",
-          `Level ${avgLevel}`,
           "",
-          "Sangat Baik",
+          "(Product Owner / Lead)",
+          "",
+          "",
+          "",
+          "(HR Manager - PT Jaga Anugerah Giat Asa)",
+        ]);
+        sheetData.push([
+          `Jabatan: ${empRole}`,
+          "",
+          "",
+          "Jabatan: Team Lead / PO",
+          "",
+          "",
+          "",
+          "PT. Jaga Anugerah Giat Asa (Assist.id)",
         ]);
 
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-        // Konfigurasi Lebar Kolom yang Rapi
+        // Lebar Kolom yang Nyaman Dibaca di Excel
         ws["!cols"] = [
-          { wch: 6 },  // No
-          { wch: 24 }, // Category
-          { wch: 34 }, // Strategy Objective
-          { wch: 30 }, // KPI Name
-          { wch: 50 }, // KPI Description & Rumus
-          { wch: 12 }, // Frequency
-          { wch: 12 }, // Bobot
-          { wch: 14 }, // Level 1
-          { wch: 14 }, // Level 2
-          { wch: 14 }, // Level 3
-          { wch: 14 }, // Level 4
-          { wch: 16 }, // Monthly Target
-          { wch: 14 }, // Actual
-          { wch: 12 }, // A/T (%)
-          { wch: 16 }, // Achieved Level
+          { wch: 6 },   // No
+          { wch: 22 },  // Category
+          { wch: 32 },  // Strategy Objective
+          { wch: 28 },  // KPI Name
+          { wch: 48 },  // KPI Description & Rumus
+          { wch: 12 },  // Frequency
+          { wch: 12 },  // Bobot (%)
+          { wch: 16 },  // Monthly Target
+          { wch: 14 },  // Actual
+          { wch: 12 },  // A/T (%)
+          { wch: 16 },  // Achieved Level
+          { wch: 16 },  // Level 1
+          { wch: 16 },  // Level 2
+          { wch: 16 },  // Level 3
+          { wch: 16 },  // Level 4
         ];
 
-        // Nama sheet bersih (Maksimal 31 karakter & karakter dilarang Excel dihilangkan)
+        // Nama Sheet yang Unik & Bersih
         let cleanSheetName = String(empName).replace(/[:\\/?*[\]]/g, "").trim() || `Karyawan_${index + 1}`;
-        cleanSheetName = cleanSheetName.substring(0, 28);
-        
-        // Mencegah duplikasi nama sheet di Excel
+        cleanSheetName = cleanSheetName.substring(0, 26);
+
         let finalSheetName = cleanSheetName;
         let counter = 1;
         while (usedSheetNames.has(finalSheetName.toLowerCase())) {
-          finalSheetName = `${cleanSheetName.substring(0, 25)}_${counter}`;
+          finalSheetName = `${cleanSheetName.substring(0, 23)}_${counter}`;
           counter++;
         }
         usedSheetNames.add(finalSheetName.toLowerCase());
 
-        XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
+        employeeSheets.push({ ws, name: finalSheetName });
       });
 
-      // Tulis dan unduh file .xlsx langsung ke browser (Semua Karyawan dalam 1 file, beda sheet)
-      const fileName = `Laporan_KPI_Semua_Karyawan_${activeTab}_${selectedYear}.xlsx`;
+      // =========================================================================
+      // 2. SHEET 1: REKAPITULASI SEMUA KARYAWAN (SUMMARY SHEET)
+      // =========================================================================
+      const summarySheetData = [
+        ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
+        ["REKAPITULASI LAPORAN EVALUASI CAPAIAN KPI SELURUH KARYAWAN"],
+        [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
+        [`Tanggal Export: ${printDateStr} • Total Karyawan: ${listToExport.length} Orang`],
+        [""],
+        [
+          "No",
+          "Nama Karyawan",
+          "ID / NIK",
+          "Divisi / Departemen",
+          "Jabatan / Posisi",
+          "Total Bobot",
+          "Rata-rata Capaian",
+          "Predikat Kinerja",
+          "Status Evaluasi",
+        ],
+        ...summaryRows,
+        [""],
+        [
+          "TOTAL KARYAWAN DIEVALUASI:",
+          `${listToExport.length} Orang`,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "PT. Jaga Anugerah Giat Asa",
+        ],
+      ];
+
+      const summaryWs = XLSX.utils.aoa_to_sheet(summarySheetData);
+      summaryWs["!cols"] = [
+        { wch: 6 },   // No
+        { wch: 28 },  // Nama Karyawan
+        { wch: 14 },  // ID / NIK
+        { wch: 22 },  // Divisi
+        { wch: 26 },  // Jabatan
+        { wch: 14 },  // Total Bobot
+        { wch: 20 },  // Rata-rata Capaian
+        { wch: 22 },  // Predikat Kinerja
+        { wch: 18 },  // Status Evaluasi
+      ];
+
+      // Masukkan Sheet Rekapitulasi di urutan pertama (Sheet 1)
+      XLSX.utils.book_append_sheet(wb, summaryWs, "REKAPITULASI");
+
+      // Masukkan Sheet masing-masing karyawan berikutnya
+      employeeSheets.forEach(({ ws, name }) => {
+        XLSX.utils.book_append_sheet(wb, ws, name);
+      });
+
+      // Unduh File Excel dengan Nama Resmi Perusahaan & Periode
+      const fileName = `Laporan_KPI_PT_Jaga_Anugerah_Giat_Asa_AssistID_${activeTab}_${selectedYear}.xlsx`;
 
       XLSX.writeFile(wb, fileName);
       setExportNotification(
-        `File Excel (.xlsx) Laporan KPI Semua Karyawan (${listToExport.length} Sheet) Periode ${activeTab} ${selectedYear} berhasil diunduh!`
+        `File Excel Laporan KPI PT. Jaga Anugerah Giat Asa (Assist.id) Periode ${activeTab} ${selectedYear} (${listToExport.length + 1} Sheet) berhasil diunduh!`
       );
-      setTimeout(() => setExportNotification(false), 4000);
+      setTimeout(() => setExportNotification(false), 4500);
     } catch (err) {
       console.error("Gagal export excel:", err);
       setExportNotification(`Gagal mengunduh file Excel: ${err?.message || "Terjadi kesalahan sistem"}`);
