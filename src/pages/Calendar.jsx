@@ -22,6 +22,7 @@ import {
   FaExclamationCircle,
   FaCalendarCheck,
   FaUser,
+  FaHistory,
 } from "react-icons/fa";
 
 import Header from "../layouts/Header";
@@ -92,6 +93,7 @@ export default function CalendarPage() {
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [displayMode, setDisplayMode] = useState("range"); // "range" (start s/d deadline) | "deadline" (hanya deadline)
+  const [listScope, setListScope] = useState("month"); // "month" (hanya bulan terpilih) | "all" (semua riwayat tugas)
 
   // Data States
   const [tasks, setTasks] = useState([]);
@@ -102,6 +104,23 @@ export default function CalendarPage() {
   // Modal States
   const [selectedTask, setSelectedTask] = useState(null);
   const [dayTasksModal, setDayTasksModal] = useState(null); // { date: Date, tasks: [] }
+
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+
+  // Opsi pilihan tahun (historis & masa depan: 2023 s/d 2030)
+  const yearOptions = useMemo(() => {
+    const years = [];
+    const base = realToday.getFullYear();
+    for (let y = base - 3; y <= base + 4; y++) {
+      years.push(y);
+    }
+    if (!years.includes(currentYear)) {
+      years.push(currentYear);
+      years.sort((a, b) => a - b);
+    }
+    return years;
+  }, [currentYear, realToday]);
 
   const formatName = (input) => {
     if (!input) return "";
@@ -143,9 +162,6 @@ export default function CalendarPage() {
     }
     return null;
   };
-
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
 
   // Load Data Task, Calendar Events, & Employees
   useEffect(() => {
@@ -289,13 +305,23 @@ export default function CalendarPage() {
     });
   }, [unifiedTasks, statusFilter, teamFilter, categoryFilter, onlyMyTasks, searchQuery, currentUserName, currentUserId]);
 
-  // Fungsi navigasi bulan
+  // Handler Ganti Bulan & Tahun
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
   };
 
   const handleNextMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
+  const handleMonthChange = (e) => {
+    const newMonth = parseInt(e.target.value, 10);
+    setCurrentDate(new Date(currentYear, newMonth, 1));
+  };
+
+  const handleYearChange = (e) => {
+    const newYear = parseInt(e.target.value, 10);
+    setCurrentDate(new Date(newYear, currentMonth, 1));
   };
 
   const handleToday = () => {
@@ -374,6 +400,23 @@ export default function CalendarPage() {
     });
   };
 
+  // Filter khusus untuk mode List (Apakah hanya bulan terpilih atau semua riwayat)
+  const listTasks = useMemo(() => {
+    if (listScope === "all") {
+      return filteredTasks;
+    }
+    // Hanya task yang jatuh di bulan & tahun yang sedang dipilih
+    return filteredTasks.filter((t) => {
+      if (t.deadlineDate) {
+        if (t.deadlineDate.getMonth() === currentMonth && t.deadlineDate.getFullYear() === currentYear) return true;
+      }
+      if (t.startDate) {
+        if (t.startDate.getMonth() === currentMonth && t.startDate.getFullYear() === currentYear) return true;
+      }
+      return false;
+    });
+  }, [filteredTasks, listScope, currentMonth, currentYear]);
+
   return (
     <div className="bg-gray-50 min-h-screen lg:h-screen lg:overflow-hidden flex flex-col">
       <Header />
@@ -386,37 +429,65 @@ export default function CalendarPage() {
       >
         {/* Header Kalender & Filter Toolbar */}
         <div className="shrink-0 flex flex-col gap-3 mb-3 sm:mb-4">
-          {/* Baris 1: Judul + Statistik Cepat + Navigasi Bulan */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
-                  {MONTH_NAMES[currentMonth]} {currentYear}
-                </h1>
-                <span className="text-xs px-2.5 py-0.5 font-bold rounded-full bg-primary-light text-primary border border-primary/20">
-                  {filteredTasks.length} Tugas
+          {/* Baris 1: Judul + Pemilih Bulan & Tahun Langsung + Navigasi */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
+            {/* Bagian Kiri: Title & Selector Bulan & Tahun */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                  Kalender & Jadwal Tugas
                 </span>
-                {isLoading && <FaSpinner className="animate-spin text-primary text-xs" />}
+                <div className="flex items-center gap-2 mt-0.5">
+                  {/* Dropdown Pilihan Bulan */}
+                  <select
+                    value={currentMonth}
+                    onChange={handleMonthChange}
+                    className="text-lg sm:text-xl font-extrabold text-gray-900 bg-transparent border-b-2 border-primary/40 hover:border-primary focus:outline-none focus:border-primary cursor-pointer py-0.5 pr-2 tracking-tight transition-colors"
+                  >
+                    {MONTH_NAMES.map((name, idx) => (
+                      <option key={idx} value={idx}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Dropdown Pilihan Tahun */}
+                  <select
+                    value={currentYear}
+                    onChange={handleYearChange}
+                    className="text-lg sm:text-xl font-extrabold text-primary bg-primary-light/50 hover:bg-primary-light border border-primary/20 rounded-xl px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer transition-all"
+                  >
+                    {yearOptions.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Badge Total Tugas */}
+                  <span className="text-xs px-2.5 py-0.5 font-bold rounded-full bg-primary-light text-primary border border-primary/20 shrink-0">
+                    {filteredTasks.length} Tugas
+                  </span>
+
+                  {isLoading && <FaSpinner className="animate-spin text-primary text-xs shrink-0" />}
+                </div>
               </div>
-              <p className="text-gray-500 text-xs font-normal mt-0.5">
-                Jadwal tugas, rentang pengerjaan, dan target deadline tim KPI.
-              </p>
             </div>
 
-            {/* Navigasi Bulan */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Bagian Kanan: Tombol Navigasi Cepat (Hari Ini, Prev Month, Next Month) */}
+            <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
               <button
                 onClick={handleToday}
                 className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                title="Kembali ke Hari Ini"
+                title="Kembali ke Bulan & Hari Ini"
               >
                 <FaCalendarCheck className="text-primary text-[11px]" />
-                Hari Ini
+                Bulan Ini
               </button>
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-0.5 shadow-2xs">
+              <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-0.5 shadow-2xs">
                 <button
                   onClick={handlePrevMonth}
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  className="p-2 text-gray-600 hover:bg-white hover:text-primary rounded-lg transition-all cursor-pointer"
                   title="Bulan Sebelumnya"
                 >
                   <FaChevronLeft size={11} />
@@ -424,7 +495,7 @@ export default function CalendarPage() {
                 <div className="h-4 w-[1px] bg-gray-200"></div>
                 <button
                   onClick={handleNextMonth}
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  className="p-2 text-gray-600 hover:bg-white hover:text-primary rounded-lg transition-all cursor-pointer"
                   title="Bulan Berikutnya"
                 >
                   <FaChevronRight size={11} />
@@ -434,7 +505,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Baris 2: View Switch + Filter & Search */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-gray-200/60">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
             {/* Bagian Kiri: Mode Kalender + Toggle Tugas Saya + Display Mode */}
             <div className="flex flex-wrap items-center gap-2">
               {/* View Switch: Month | Week | List */}
@@ -488,6 +559,28 @@ export default function CalendarPage() {
                   Hanya Deadline
                 </button>
               </div>
+
+              {/* Toggle Scope pada List View: Bulan Ini vs Semua Riwayat */}
+              {viewType === "List" && (
+                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-0.5 text-xs font-medium shadow-2xs text-gray-600">
+                  <button
+                    onClick={() => setListScope("month")}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] ${
+                      listScope === "month" ? "bg-primary-light text-primary font-bold" : "hover:text-gray-900"
+                    }`}
+                  >
+                    Bulan {MONTH_NAMES[currentMonth].slice(0, 3)} {currentYear}
+                  </button>
+                  <button
+                    onClick={() => setListScope("all")}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer text-[11px] flex items-center gap-1 ${
+                      listScope === "all" ? "bg-primary-light text-primary font-bold" : "hover:text-gray-900"
+                    }`}
+                  >
+                    <FaHistory size={10} /> Semua Riwayat
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Bagian Kanan: Filter Dropdowns & Search */}
@@ -603,7 +696,6 @@ export default function CalendarPage() {
                       <div className="flex flex-col gap-1 overflow-hidden my-auto">
                         {visibleTasks.map((t) => {
                           const catConf = CATEGORY_CONFIG[t.category] || CATEGORY_CONFIG.Feature;
-                          const statConf = STATUS_CONFIG[t.status] || STATUS_CONFIG.Backlog;
                           const isDeadlineDay =
                             t.deadlineDate &&
                             t.deadlineDate.getDate() === cell.dayNumber &&
@@ -793,15 +885,15 @@ export default function CalendarPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-700">
-                  {filteredTasks.length === 0 ? (
+                  {listTasks.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-10 text-gray-400">
                         <FaTasks className="mx-auto text-2xl mb-2 text-gray-300" />
-                        Tidak ada tugas yang sesuai filter.
+                        Tidak ada tugas yang sesuai pada periode ini.
                       </td>
                     </tr>
                   ) : (
-                    filteredTasks.map((t) => {
+                    listTasks.map((t) => {
                       const catConf = CATEGORY_CONFIG[t.category] || CATEGORY_CONFIG.Feature;
                       const statConf = STATUS_CONFIG[t.status] || STATUS_CONFIG.Backlog;
 
