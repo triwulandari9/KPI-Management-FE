@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  FaFilePdf,
+  FaFileExport,
   FaUserTie,
   FaCheckCircle,
   FaTimes,
@@ -23,8 +23,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { kpiService } from "../services/kpiService";
 import { employeeService } from "../services/employeeService";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 // Daftar 10+ Tab Bulan / Periode
 const MONTH_TABS = [
@@ -300,7 +299,6 @@ export default function KpiTracking() {
     loadKpiEvaluation();
   }, [loadKpiEvaluation]);
 
-
   // Cegah pengetikan tanda minus, plus, atau exponential di input angka
   const handleKeyDownNonNegative = (e) => {
     if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
@@ -335,7 +333,6 @@ export default function KpiTracking() {
     setExportNotification("Nilai input KPI berhasil di-reset ke nilai default!");
     setTimeout(() => setExportNotification(false), 3000);
   };
-
 
   // Helper untuk menghitung metrik KPI dari kumpulan input tertentu
   const calculateMetricsForInputs = (inputs) => {
@@ -445,158 +442,276 @@ export default function KpiTracking() {
   ).toFixed(1);
   const totalLevel4 = computedMetrics.filter((m) => m.achievedLevel === 4).length;
 
-  // Unduh File PDF Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
-  const handleDownloadPDF = () => {
+  // Unduh File Excel Laporan KPI (.xlsx) Multi-Sheet Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
+  const handleExportKPI = () => {
     try {
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
+      const wb = XLSX.utils.book_new();
       const printDateStr = new Date().toLocaleDateString("id-ID", {
         day: "numeric",
         month: "long",
         year: "numeric",
       });
 
-      const empName = currentEmployee?.name || currentUser?.name || "Karyawan";
-      const empId = currentEmployee?.id || currentEmployee?._id || "EMP-001";
-      const empRole = currentEmployee?.role || currentEmployee?.position || "Software Engineer";
-      const empDept = currentEmployee?.division || currentEmployee?.department || "Engineering";
+      // Daftar seluruh karyawan yang akan diekspor
+      const listToExport =
+        Array.isArray(employeesList) && employeesList.length > 0
+          ? employeesList
+          : Array.isArray(EMPLOYEES) && EMPLOYEES.length > 0
+          ? EMPLOYEES
+          : [currentEmployee || { name: currentUser?.name || "Karyawan", role: currentUser?.role || "Staff" }];
 
-      const { metrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(kpiInputs);
+      const usedSheetNames = new Set();
+      const summaryRows = [];
 
-      // Header Brand
-      doc.setFillColor(45, 99, 177); // Primary Blue #2D63B1
-      doc.rect(0, 0, 297, 24, "F");
+      // =========================================================================
+      // 1. GENERATE INDIVIDUAL EMPLOYEE SHEETS & COLLECT DATA FOR SUMMARY
+      // =========================================================================
+      const employeeSheets = [];
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)", 14, 11);
+      listToExport.forEach((emp, index) => {
+        const empName = emp?.name || emp?.fullName || emp?.username || `Karyawan ${index + 1}`;
+        const empId = emp?.id || emp?._id || `EMP-${String(index + 1).padStart(3, "0")}`;
+        const empRole = emp?.role || emp?.position || emp?.jobTitle || "Software Engineer";
+        const empDept = emp?.division || emp?.department || "Engineering";
 
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text("LAPORAN EVALUASI CAPAIAN KEY PERFORMANCE INDICATOR (KPI)", 14, 18);
+        // Ambil input nilai KPI karyawan dari localStorage jika ada, atau gunakan default
+        let empInputs = DEFAULT_INPUTS;
+        try {
+          const cached = localStorage.getItem(`kpi_inputs_${empId}_${monthNumber}_${selectedYear}`);
+          if (cached) {
+            empInputs = JSON.parse(cached);
+          } else if (empId === targetEmpId) {
+            empInputs = kpiInputs;
+          }
+        } catch {
+          empInputs = DEFAULT_INPUTS;
+        }
 
-      doc.setFontSize(8);
-      doc.text(`Dicetak: ${printDateStr}`, 283, 15, { align: "right" });
+        const { metrics: empMetrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(empInputs);
 
-      // Employee Information Box
-      doc.setDrawColor(220, 225, 230);
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(14, 28, 269, 22, 2, 2, "FD");
+        // Kumpulkan ke ringkasan
+        summaryRows.push([
+          index + 1,
+          empName,
+          empId,
+          empDept,
+          empRole,
+          `${weightSum}%`,
+          `Level ${averageLevel}`,
+          predicate,
+          "Terverifikasi",
+        ]);
 
-      doc.setTextColor(51, 65, 85);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("INFORMASI KARYAWAN & PERIODE PENILAIAN", 18, 34);
-
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Nama Karyawan : ${empName}`, 18, 41);
-      doc.text(`ID / NIP       : ${empId}`, 18, 46);
-
-      doc.text(`Divisi / Dept  : ${empDept}`, 105, 41);
-      doc.text(`Posisi / Role  : ${empRole}`, 105, 46);
-
-      doc.text(`Periode Bulan  : ${activeTab}`, 190, 41);
-      doc.text(`Tahun Evaluasi : ${selectedYear}`, 190, 46);
-
-      // Summary KPI Badges Box
-      doc.setFillColor(234, 241, 250); // primary light
-      doc.roundedRect(14, 53, 269, 14, 2, 2, "FD");
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(45, 99, 177);
-      doc.text(`Rata-Rata Capaian: Level ${averageLevel}`, 20, 62);
-      doc.text(`Predikat Kinerja: ${predicate}`, 90, 62);
-      doc.text(`Total Bobot Metrik: ${weightSum}%`, 175, 62);
-      doc.text("Status: Terverifikasi Sistem", 240, 62);
-
-      // Table of KPI Metrics
-      const tableData = metrics.map((m) => [
-        m.no,
-        m.category,
-        m.kpiName,
-        m.monthlyTarget,
-        `${m.weight}%`,
-        m.actual,
-        m.atPercent,
-        `Level ${m.achievedLevel}`,
-        `${((m.weight * m.achievedLevel) / 4).toFixed(1)}`,
-      ]);
-
-      autoTable(doc, {
-        startY: 70,
-        head: [
+        // Struktur Sheet Detail Karyawan
+        const sheetData = [
+          ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
+          ["LAPORAN EVALUASI CAPAIAN KEY PERFORMANCE INDICATOR (KPI)"],
+          [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
+          [""],
+          ["INFORMASI KARYAWAN:"],
+          ["Nama Karyawan", empName, "", "ID / NIK", empId, "", "Periode", `${activeTab} ${selectedYear}`],
+          ["Jabatan / Posisi", empRole, "", "Divisi / Departemen", empDept, "", "Tanggal Cetak", printDateStr],
+          [""],
           [
             "No",
-            "Perspektif",
-            "Sasaran / Nama Indikator KPI",
-            "Target",
-            "Bobot",
-            "Realisasi",
-            "% Capaian",
-            "Level",
-            "Skor",
+            "Category",
+            "Strategy Objective",
+            "KPI Name",
+            "KPI Description & Rumus",
+            "Frequency",
+            "Bobot (%)",
+            "Monthly Target",
+            "Actual",
+            "A/T (%)",
+            "Achieved Level",
+            "Rubrik Level 1",
+            "Rubrik Level 2",
+            "Rubrik Level 3",
+            "Rubrik Level 4",
           ],
-        ],
-        body: tableData,
-        theme: "striped",
-        headStyles: {
-          fillColor: [45, 99, 177],
-          textColor: [255, 255, 255],
-          fontSize: 7.5,
-          fontStyle: "bold",
-          halign: "center",
-        },
-        bodyStyles: {
-          fontSize: 7,
-          textColor: [30, 41, 59],
-        },
-        columnStyles: {
-          0: { halign: "center", cellWidth: 10 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 80 },
-          3: { halign: "center", cellWidth: 24 },
-          4: { halign: "center", cellWidth: 16 },
-          5: { halign: "center", cellWidth: 24 },
-          6: { halign: "center", cellWidth: 24 },
-          7: { halign: "center", cellWidth: 20 },
-          8: { halign: "center", cellWidth: 16 },
-        },
-        margin: { left: 14, right: 14 },
+        ];
+
+        // Baris Data KPI Karyawan
+        empMetrics.forEach((k) => {
+          sheetData.push([
+            k.no,
+            k.category,
+            k.objective,
+            k.kpiName,
+            k.description,
+            k.frequency,
+            `${k.weight}%`,
+            k.monthlyTarget || "-",
+            k.actual || "-",
+            k.atPercent || "-",
+            `Level ${k.achievedLevel || 1}`,
+            k.levels?.l1 || "-",
+            k.levels?.l2 || "-",
+            k.levels?.l3 || "-",
+            k.levels?.l4 || "-",
+          ]);
+        });
+
+        // Baris Total & Predikat Evaluasi
+        sheetData.push([""]);
+        sheetData.push([
+          "TOTAL BOBOT:",
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${weightSum}%`,
+          "",
+          "RATA-RATA LEVEL:",
+          `Level ${averageLevel} / 4.0`,
+          "",
+          "PREDIKAT EVALUASI:",
+          predicate,
+          "",
+          "",
+          "",
+        ]);
+        sheetData.push([""]);
+
+        // Lembar Tanda Tangan Resmi
+        sheetData.push(["LEMBAR PENGESAHAN & PERSETUJUAN"]);
+        sheetData.push([
+          "Dibuat Oleh (Karyawan):",
+          "",
+          "",
+          "Ditinjau Oleh (Atasan Langsung):",
+          "",
+          "",
+          "",
+          "Disetujui Oleh (HR Department):",
+        ]);
+        sheetData.push([""]);
+        sheetData.push([""]);
+        sheetData.push([
+          `(${empName})`,
+          "",
+          "",
+          "(Product Owner / Lead)",
+          "",
+          "",
+          "",
+          "(HR Manager - PT Jaga Anugerah Giat Asa)",
+        ]);
+        sheetData.push([
+          `Jabatan: ${empRole}`,
+          "",
+          "",
+          "Jabatan: Team Lead / PO",
+          "",
+          "",
+          "",
+          "PT. Jaga Anugerah Giat Asa (Assist.id)",
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+        // Lebar Kolom yang Nyaman Dibaca di Excel
+        ws["!cols"] = [
+          { wch: 6 },   // No
+          { wch: 22 },  // Category
+          { wch: 32 },  // Strategy Objective
+          { wch: 28 },  // KPI Name
+          { wch: 48 },  // KPI Description & Rumus
+          { wch: 12 },  // Frequency
+          { wch: 12 },  // Bobot (%)
+          { wch: 16 },  // Monthly Target
+          { wch: 14 },  // Actual
+          { wch: 12 },  // A/T (%)
+          { wch: 16 },  // Achieved Level
+          { wch: 16 },  // Level 1
+          { wch: 16 },  // Level 2
+          { wch: 16 },  // Level 3
+          { wch: 16 },  // Level 4
+        ];
+
+        // Nama Sheet yang Unik & Bersih
+        let cleanSheetName = String(empName).replace(/[:\\/?*[\]]/g, "").trim() || `Karyawan_${index + 1}`;
+        cleanSheetName = cleanSheetName.substring(0, 26);
+
+        let finalSheetName = cleanSheetName;
+        let counter = 1;
+        while (usedSheetNames.has(finalSheetName.toLowerCase())) {
+          finalSheetName = `${cleanSheetName.substring(0, 23)}_${counter}`;
+          counter++;
+        }
+        usedSheetNames.add(finalSheetName.toLowerCase());
+
+        employeeSheets.push({ ws, name: finalSheetName });
       });
 
-      // Signature / Approval Section
-      const finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || 160;
-      const sigY = Math.min(finalY + 12, 175);
+      // =========================================================================
+      // 2. SHEET 1: REKAPITULASI SEMUA KARYAWAN (SUMMARY SHEET)
+      // =========================================================================
+      const summarySheetData = [
+        ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
+        ["REKAPITULASI LAPORAN EVALUASI CAPAIAN KPI SELURUH KARYAWAN"],
+        [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
+        [`Tanggal Export: ${printDateStr} • Total Karyawan: ${listToExport.length} Orang`],
+        [""],
+        [
+          "No",
+          "Nama Karyawan",
+          "ID / NIK",
+          "Divisi / Departemen",
+          "Jabatan / Posisi",
+          "Total Bobot",
+          "Rata-rata Capaian",
+          "Predikat Kinerja",
+          "Status Evaluasi",
+        ],
+        ...summaryRows,
+        [""],
+        [
+          "TOTAL KARYAWAN DIEVALUASI:",
+          `${listToExport.length} Orang`,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "PT. Jaga Anugerah Giat Asa",
+        ],
+      ];
 
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(71, 85, 105);
+      const summaryWs = XLSX.utils.aoa_to_sheet(summarySheetData);
+      summaryWs["!cols"] = [
+        { wch: 6 },   // No
+        { wch: 28 },  // Nama Karyawan
+        { wch: 14 },  // ID / NIK
+        { wch: 22 },  // Divisi
+        { wch: 26 },  // Jabatan
+        { wch: 14 },  // Total Bobot
+        { wch: 20 },  // Rata-rata Capaian
+        { wch: 22 },  // Predikat Kinerja
+        { wch: 18 },  // Status Evaluasi
+      ];
 
-      doc.text("Karyawan Yang Dinilai,", 35, sigY);
-      doc.line(35, sigY + 16, 75, sigY + 16);
-      doc.text(`( ${empName} )`, 35, sigY + 20);
+      // Masukkan Sheet Rekapitulasi di urutan pertama (Sheet 1)
+      XLSX.utils.book_append_sheet(wb, summaryWs, "REKAPITULASI");
 
-      doc.text("Disetujui Oleh (Atasan / HR),", 220, sigY);
-      doc.line(220, sigY + 16, 260, sigY + 16);
-      doc.text("( Human Resources / Lead )", 220, sigY + 20);
+      // Masukkan Sheet masing-masing karyawan berikutnya
+      employeeSheets.forEach(({ ws, name }) => {
+        XLSX.utils.book_append_sheet(wb, ws, name);
+      });
 
-      const fileName = `Laporan_KPI_${empName.replace(/\s+/g, "_")}_${activeTab}_${selectedYear}.pdf`;
-      doc.save(fileName);
+      // Unduh File Excel dengan Nama Resmi Perusahaan & Periode
+      const fileName = `Laporan_KPI_PT_Jaga_Anugerah_Giat_Asa_AssistID_${activeTab}_${selectedYear}.xlsx`;
 
+      XLSX.writeFile(wb, fileName);
       setExportNotification(
-        `File PDF Laporan KPI ${empName} (${activeTab} ${selectedYear}) berhasil diunduh!`
+        `Laporan KPI PT. Jaga Anugerah Giat Asa (Assist.id) Periode ${activeTab} ${selectedYear} (${listToExport.length + 1} Sheet) berhasil diunduh!`
       );
       setTimeout(() => setExportNotification(false), 4500);
     } catch (err) {
-      console.error("Gagal export PDF:", err);
-      setExportNotification(`Gagal mengunduh file PDF: ${err?.message || "Terjadi kesalahan"}`);
+      console.error("Gagal export KPI:", err);
+      setExportNotification(`Gagal mengunduh file laporan KPI: ${err?.message || "Terjadi kesalahan sistem"}`);
       setTimeout(() => setExportNotification(false), 5000);
     }
   };
@@ -621,13 +736,13 @@ export default function KpiTracking() {
               <FaEdit /> Input Capaian KPI
             </button>
 
-            {/* Tombol Export Excel */}
+            {/* Tombol Export KPI (Format Excel Multi-Sheet) */}
             <button
-              onClick={handleDownloadPDF}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
-              title="Unduh file PDF resmi laporan KPI karyawan"
+              onClick={handleExportKPI}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              title={isHR ? "Unduh file laporan KPI seluruh sheet data karyawan" : "Unduh file laporan evaluasi KPI"}
             >
-              <FaFilePdf /> Export PDF
+              <FaFileExport /> Export KPI
             </button>
           </div>
         </PageHeader>
@@ -800,215 +915,110 @@ export default function KpiTracking() {
           </div>
         </div>
 
-        {/* TABEL UTAMA EVALUASI KPI */}
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-2 px-1">
-          <span className="font-semibold text-gray-700">Tabel Evaluasi Capaian Bulanan</span>
-          <span className="text-[11px] text-gray-400">Periode: {activeTab} {selectedYear} • PT. JAGA</span>
-        </div>
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-200/80 overflow-hidden mb-8 w-full">
-          <div className="w-full overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-full">
-              {/* Colgroup untuk memastikan ke-15 kolom terbagi 100% pas layar tanpa terpotong */}
-              <colgroup>
-                <col style={{ width: "2.5%" }} />   {/* 1. No */}
-                <col style={{ width: "7%" }} />     {/* 2. Category */}
-                <col style={{ width: "11%" }} />    {/* 3. Strategy Objective */}
-                <col style={{ width: "10%" }} />    {/* 4. KPI Name */}
-                <col style={{ width: "14.5%" }} />  {/* 5. KPI Description & Rumus */}
-                <col style={{ width: "4.5%" }} />   {/* 6. Frequency */}
-                <col style={{ width: "4.5%" }} />   {/* 7. Bobot */}
-                <col style={{ width: "5%" }} />     {/* 8. Level 1 */}
-                <col style={{ width: "5%" }} />     {/* 9. Level 2 */}
-                <col style={{ width: "5%" }} />     {/* 10. Level 3 */}
-                <col style={{ width: "5%" }} />     {/* 11. Level 4 */}
-                <col style={{ width: "6%" }} />     {/* 12. Target */}
-                <col style={{ width: "6%" }} />     {/* 13. Actual */}
-                <col style={{ width: "5.5%" }} />   {/* 14. A/T (%) */}
-                <col style={{ width: "8.5%" }} />   {/* 15. Level Capaian */}
-              </colgroup>
-
+        {/* TABEL UTAMA EVALUASI KPI (8 INDIKATOR) */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[950px]">
               <thead>
-                {/* Baris 1 Header Excel */}
-                <tr className="bg-gray-100 border-b border-gray-200 text-gray-700 font-bold">
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">No</th>
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">Category</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">Strategy Objective</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">KPI Name</th>
-                  <th rowSpan="2" className="p-1.5 border-r border-gray-200 text-[10px]">KPI Description & Rumus</th>
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center text-[10px]">Frequency</th>
-                  <th rowSpan="2" className="p-1 border-r border-gray-200 text-center bg-blue-100 text-blue-900 text-[10px]">Bobot</th>
-                  {/* Header Level Description Ungu Gelap seperti di Excel */}
-                  <th colSpan="4" className="p-1.5 text-center bg-[#581845] text-white font-bold border-r border-gray-200 text-[10.5px]">
-                    Level Description
-                  </th>
-                  {/* Header Nilai Aktual Hijau seperti di Excel */}
-                  <th colSpan="4" className="p-1.5 text-center bg-[#4E9F3D] text-white font-bold text-[10.5px]">
-                    Pencapaian Bulan {activeTab} {selectedYear}
-                  </th>
-                </tr>
-
-                {/* Baris 2 Header Sub-Kolom Level & Nilai */}
-                <tr className="border-b border-gray-200 text-[9.5px]">
-                  {/* Sub-Header Level 1 - 4 */}
-                  <th className="p-1 text-center bg-[#7B241C]/90 text-white border-r border-white/20">Level 1</th>
-                  <th className="p-1 text-center bg-[#7B241C]/80 text-white border-r border-white/20">Level 2</th>
-                  <th className="p-1 text-center bg-[#7B241C]/70 text-white border-r border-white/20">Level 3</th>
-                  <th className="p-1 text-center bg-[#7B241C]/60 text-white border-r border-gray-300">Level 4</th>
-
-                  {/* Sub-Header Target, Actual, A/T, Level Capaian */}
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">Target</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">Actual</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 border-r border-gray-200">A/T (%)</th>
-                  <th className="p-1 text-center bg-[#D8E9A8] text-gray-800 font-bold">Level</th>
+                <tr className="bg-gray-50/80 border-b border-gray-200/80 text-gray-500 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3.5 px-3 text-center w-10">No</th>
+                  <th className="py-3.5 px-3 w-40">Perspektif</th>
+                  <th className="py-3.5 px-4 w-64">Sasaran Strategis & Nama KPI</th>
+                  <th className="py-3.5 px-3 text-center w-24">Target</th>
+                  <th className="py-3.5 px-3 text-center w-16">Bobot</th>
+                  <th className="py-3.5 px-3 text-center w-24">Realisasi</th>
+                  <th className="py-3.5 px-3 text-center w-20">% Capaian</th>
+                  <th className="py-3.5 px-3 text-center w-24">Level</th>
+                  <th className="py-3.5 px-3 text-center w-20">Skor</th>
                 </tr>
               </thead>
-
-              <tbody className="divide-y divide-gray-200 text-gray-800 text-[10px]">
-                {computedMetrics.map((kpi) => (
-                  <tr key={kpi.no} id={`kpi-${kpi.no}`} className="hover:bg-blue-50/30 transition-colors duration-200">
-                    {/* No */}
-                    <td className="p-1 border-r border-gray-200 text-center font-bold text-gray-500 text-[10px]">
-                      {kpi.no}
-                    </td>
-
-                    {/* Category Badge */}
-                    <td className="p-1 border-r border-gray-200 text-center">
-                      <span className={`inline-block px-1 py-0.5 rounded text-[8.5px] font-bold border leading-tight text-center whitespace-normal break-words ${kpi.categoryBg}`}>
-                        {kpi.category}
-                      </span>
-                    </td>
-
-                    {/* Strategy Objective */}
-                    <td className="p-1.5 border-r border-gray-200 font-medium text-gray-700 text-[9.5px] leading-snug break-words hyphens-auto">
-                      {kpi.objective}
-                    </td>
-
-                    {/* KPI Name */}
-                    <td className="p-1.5 border-r border-gray-200 font-bold text-gray-900 text-[10px] leading-snug break-words">
-                      {kpi.kpiName}
-                    </td>
-
-                    {/* Description Murni */}
-                    <td className="p-1.5 border-r border-gray-200 text-gray-600 leading-snug text-[9px] break-words">
-                      {kpi.description}
-                    </td>
-
-                    {/* Frequency */}
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 font-medium text-[9.5px]">
-                      {kpi.frequency}
-                    </td>
-
-                    {/* Bobot */}
-                    <td className="p-1 border-r border-gray-200 text-center font-bold text-blue-800 bg-blue-50/50 text-[10px]">
-                      {kpi.weight}%
-                    </td>
-
-                    {/* Level Description 1 - 4 */}
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-500 bg-gray-50/40 text-[9px] leading-tight break-words">
-                      {kpi.levels.l1}
-                    </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-600 bg-gray-50/40 text-[9px] leading-tight break-words">
-                      {kpi.levels.l2}
-                    </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-gray-700 bg-gray-50/40 font-medium text-[9px] leading-tight break-words">
-                      {kpi.levels.l3}
-                    </td>
-                    <td className="p-1 border-r border-gray-200 text-center text-emerald-700 bg-emerald-50/30 font-bold text-[9px] leading-tight break-words">
-                      {kpi.levels.l4}
-                    </td>
-
-                    {/* Target & Actual */}
-                    <td className="p-1 border-r border-gray-200 text-center font-semibold text-gray-700 text-[9.5px] break-words">
-                      {kpi.monthlyTarget}
-                    </td>
-                    <td className="p-1 border-r border-gray-200 text-center font-extrabold text-gray-900 bg-emerald-50/20 text-[9.5px] break-words">
-                      {kpi.actual}
-                    </td>
-                    <td className="p-1 border-r border-gray-200 text-center font-bold text-primary text-[9.5px]">
-                      {kpi.atPercent}
-                    </td>
-
-                    {/* Capaian Level Badge */}
-                    <td className="p-1 text-center">
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded-full font-bold text-[9px] shadow-2xs whitespace-nowrap ${kpi.achievedLevel === 4
-                            ? "bg-green-100 text-green-700 border border-green-300"
-                            : kpi.achievedLevel === 3
-                              ? "bg-blue-100 text-blue-700 border border-blue-300"
-                              : kpi.achievedLevel === 2
-                                ? "bg-amber-100 text-amber-700 border border-amber-300"
-                                : "bg-rose-100 text-rose-700 border border-rose-300"
-                          }`}
-                      >
-                        Level {kpi.achievedLevel}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-gray-100">
+                {computedMetrics.map((m) => {
+                  const score = ((m.weight * m.achievedLevel) / 4).toFixed(1);
+                  return (
+                    <tr key={m.no} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="py-3.5 px-3 text-center font-bold text-gray-400 text-[11px]">{m.no}</td>
+                      <td className="py-3.5 px-3">
+                        <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-xl border ${m.categoryBg}`}>
+                          {m.category}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <p className="font-bold text-gray-900 text-xs">{m.kpiName}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{m.description}</p>
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-semibold text-gray-700">{m.monthlyTarget}</td>
+                      <td className="py-3.5 px-3 text-center font-bold text-gray-800">{m.weight}%</td>
+                      <td className="py-3.5 px-3 text-center font-bold text-primary bg-primary-light/20 rounded-xl">
+                        {m.actual}
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-bold text-gray-700">{m.atPercent}</td>
+                      <td className="py-3.5 px-3 text-center">
+                        <span className={`inline-flex items-center justify-center font-bold text-xs px-2.5 py-1 rounded-xl shadow-2xs ${
+                          m.achievedLevel === 4
+                            ? "bg-green-100 text-green-700 border border-green-200"
+                            : m.achievedLevel === 3
+                            ? "bg-blue-100 text-blue-700 border border-blue-200"
+                            : m.achievedLevel === 2
+                            ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-rose-100 text-rose-700 border border-rose-200"
+                        }`}>
+                          Level {m.achievedLevel}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-center font-extrabold text-gray-900">{score}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
-
-              {/* Total Summary Footer */}
               <tfoot>
-                <tr className="bg-gray-100/90 font-bold text-gray-900 border-t-2 border-gray-300 text-[10px]">
-                  <td colSpan="6" className="p-2 text-right uppercase tracking-wider text-[10px]">
-                    TOTAL BOBOT KPI:
-                  </td>
-                  <td className="p-2 text-center text-blue-900 bg-blue-100 font-bold text-[10px]">
-                    {totalWeight}%
-                  </td>
-                  <td colSpan="4" className="p-2 text-center text-gray-500 text-[9.5px]">
-                    Kriteria Level 1 - 4 Terstandarisasi
-                  </td>
-                  <td colSpan="3" className="p-2 text-right text-[10px]">
-                    Rata-rata Capaian Tim:
-                  </td>
-                  <td className="p-2 text-center bg-green-100 text-green-800 text-xs font-bold">
-                    Level {avgLevel}
+                <tr className="bg-gray-50/90 font-bold text-xs text-gray-800 border-t-2 border-gray-200">
+                  <td colSpan={4} className="py-3.5 px-4 text-right">TOTAL BOBOT & RATA-RATA CAPAIAN:</td>
+                  <td className="py-3.5 px-3 text-center text-primary font-extrabold">{totalWeight}%</td>
+                  <td colSpan={2} className="py-3.5 px-3 text-center text-gray-500">Predikat: <b>{calculateMetricsForInputs(kpiInputs).predicate}</b></td>
+                  <td className="py-3.5 px-3 text-center text-green-700 font-extrabold">Level {avgLevel}</td>
+                  <td className="py-3.5 px-3 text-center text-primary font-black">
+                    {computedMetrics.reduce((acc, m) => acc + (m.weight * m.achievedLevel) / 4, 0).toFixed(1)}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
-        {/* MODAL: Form Input Capaian KPI Karyawan */}
+
+        {/* MODAL: INPUT CAPAIAN KPI KARYAWAN */}
         {isInputModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-            <div className="bg-white rounded-2xl sm:rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-              {/* Header Modal */}
-              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center text-lg shadow-sm">
-                    <FaEdit />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-gray-900">
-                      Form Pengisian Capaian KPI Karyawan
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      Evaluasi Kinerja: <b>{currentEmployee.name}</b> • Periode: <b>{activeTab} {selectedYear}</b>
-                    </p>
-                  </div>
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+              <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                <div>
+                  <h3 className="font-bold text-base text-gray-800">Input Capaian Real-Time KPI</h3>
+                  <p className="text-xs text-gray-400">
+                    Karyawan: <b className="text-primary">{currentEmployee.name}</b> • Periode: <b>{activeTab} {selectedYear}</b>
+                  </p>
                 </div>
                 <button
                   onClick={() => setIsInputModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 cursor-pointer"
+                  className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
                 >
                   <FaTimes />
                 </button>
               </div>
 
-              {/* Body Modal: 8 Input Form Cards */}
-              <div className="my-4 flex-1 overflow-y-auto pr-1 space-y-4 text-xs">
+              <div className="py-4 flex flex-col gap-4">
+                <p className="text-xs text-gray-500 leading-relaxed bg-blue-50/60 p-3 rounded-2xl border border-blue-100/80">
+                  Silakan ubah angka realisasi berikut untuk memperbarui kalkulasi level dan rumus KPI secara dinamis.
+                </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* KPI 1: On Time Delivery */}
                   <div className="p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl flex flex-col justify-between gap-2.5">
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">1. On Time Delivery</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
+                        <span className="text-[10px] bg-orange-100 text-orange-800 border border-orange-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: Naik 90% tepat waktu sesuai sprint</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Minimal 90% fitur naik tepat waktu</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -1023,7 +1033,7 @@ export default function KpiTracking() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-gray-600">Total Fitur</label>
+                        <label className="text-[10px] font-semibold text-gray-600">Total Fitur Dijadwalkan</label>
                         <input
                           type="number"
                           min="0"
@@ -1045,13 +1055,13 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">2. SLA Ticket Bug</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
+                        <span className="text-[10px] bg-orange-100 text-orange-800 border border-orange-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: 90% ticket diselesaikan tepat SLA</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Minimal 90% ticket bug selesai sesuai SLA</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] font-semibold text-gray-600">Ticket Sesuai SLA</label>
+                        <label className="text-[10px] font-semibold text-gray-600">Ticket Selesai SLA</label>
                         <input
                           type="number"
                           min="0"
@@ -1079,17 +1089,17 @@ export default function KpiTracking() {
                     </div>
                   </div>
 
-                  {/* KPI 3: Production Bug Density */}
+                  {/* KPI 3: Bug Density */}
                   <div className="p-3.5 bg-gray-50/80 border border-gray-200 rounded-2xl flex flex-col justify-between gap-2.5">
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">3. Production Bug Density</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
+                        <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: ≤ 5 Bug di environment production</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Maksimal 5 Bug di Production</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-600">Jumlah Bug Ditemukan di Production</label>
+                      <label className="text-[10px] font-semibold text-gray-600">Jumlah Bug Production</label>
                       <input
                         type="number"
                         min="0"
@@ -1110,12 +1120,12 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">4. Continuous Improvement</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
+                        <span className="text-[10px] bg-orange-100 text-orange-800 border border-orange-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: 3 Item inovasi / optimasi per bulan</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: 2 Inisiatif/Bulan</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-600">Jumlah Inisiatif / Optimasi Diterapkan</label>
+                      <label className="text-[10px] font-semibold text-gray-600">Jumlah Inisiatif / Optimasi</label>
                       <input
                         type="number"
                         min="0"
@@ -1136,9 +1146,9 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">5. Tech Debt Completion</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 5%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: 60% pembersihan tech debt terjadwal</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Minimal 60% Tech Debt Selesai</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -1153,7 +1163,7 @@ export default function KpiTracking() {
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-gray-600">Target Tech Debt</label>
+                        <label className="text-[10px] font-semibold text-gray-600">Total Target Tech Debt</label>
                         <input
                           type="number"
                           min="0"
@@ -1175,12 +1185,12 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">6. Task Completion Rate</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
+                        <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: &lt; 48 Jam rata-rata pengerjaan task</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Rata-rata durasi &lt; 48 Jam</p>
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-600">Rata-rata Durasi Pengerjaan (Jam)</label>
+                      <label className="text-[10px] font-semibold text-gray-600">Rata-rata Durasi (Jam)</label>
                       <input
                         type="number"
                         min="0"
@@ -1201,9 +1211,9 @@ export default function KpiTracking() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-gray-900 text-xs">7. Task Backward Rate</span>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
+                        <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: &lt; 20% task yang mental / ditolak QA</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: Reject QA &lt; 20%</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -1242,7 +1252,7 @@ export default function KpiTracking() {
                         <span className="font-bold text-gray-900 text-xs">8. Sprint Point (SP)</span>
                         <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xl font-bold whitespace-nowrap">Bobot 15%</span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1">Target: 88 SP tercapai per bulan</p>
+                      <p className="text-[11px] text-gray-500 mt-1">Target: 88 SP tercapai per bulan (Indikator Keaktifan)</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
