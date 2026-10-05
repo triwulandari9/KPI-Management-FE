@@ -23,6 +23,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { kpiService } from "../services/kpiService";
 import { employeeService } from "../services/employeeService";
+import { taskService } from "../services/taskService";
 import * as XLSX from "xlsx";
 
 // Daftar 10+ Tab Bulan / Periode
@@ -37,23 +38,16 @@ const YEARS = [
   "2031", "2032", "2033", "2034", "2035", "2036"
 ];
 
-// Data Karyawan untuk Switcher HR & Export Multi-Sheet
-const EMPLOYEES = [
-  { id: "EMP-001", name: "Sari Wulandari", role: "Frontend Developer" },
-  { id: "EMP-002", name: "Musa Al-Kindi", role: "Backend Developer" },
-  { id: "EMP-003", name: "Mitha Amalia", role: "UI/UX Designer" },
-  { id: "EMP-004", name: "Dimas Pratama", role: "Quality Assurance" },
-];
-
-const DEFAULT_INPUTS = {
-  1: { onTime: 9, total: 10 },
-  2: { onSla: 19, total: 20 },
-  3: { bugCount: 2 },
-  4: { count: 3 },
+// Nilai Standar Input Bersih (Tanpa Data Dummy)
+const CLEAN_INPUTS = {
+  1: { onTime: 0, total: 0 },
+  2: { onSla: 0, total: 0 },
+  3: { bugCount: 0 },
+  4: { count: 0 },
   5: { done: 0, total: 0 },
-  6: { hours: 36 },
-  7: { rejectCount: 2, totalTasks: 15 },
-  8: { spEarned: 98, spTarget: 88 },
+  6: { hours: 0 },
+  7: { rejectCount: 0, totalTasks: 0 },
+  8: { spEarned: 0, spTarget: 88 },
 };
 
 const KPI_METRICS_TEMPLATE = [
@@ -175,31 +169,44 @@ export default function KpiTracking() {
   const [exportNotification, setExportNotification] = useState(false);
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isLoadingEvaluation, setIsLoadingEvaluation] = useState(false);
   const [beEvaluation, setBeEvaluation] = useState(null);
 
-  // State Input Real-Time Karyawan untuk Setiap Rumus KPI
-  const [kpiInputs, setKpiInputs] = useState(DEFAULT_INPUTS);
+  // State Input Real-Time Karyawan untuk Setiap Rumus KPI (Inisialisasi bersih tanpa dummy)
+  const [kpiInputs, setKpiInputs] = useState(CLEAN_INPUTS);
 
   // Load Real Employees from Backend
   const fetchEmployees = async () => {
+    setIsLoadingEmployees(true);
     try {
       const data = await employeeService.getEmployees({ _t: Date.now() });
       if (Array.isArray(data) && data.length > 0) {
         setEmployeesList(data);
         if (isHR) {
           setSelectedEmp((prev) => prev || data[0]._id || data[0].id);
+        } else {
+          const myMatch = data.find(
+            (e) =>
+              (e.email && currentUser?.email && e.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+              (e._id && (e._id === currentUser?._id || e._id === currentUser?.id)) ||
+              (e.id && (e.id === currentUser?._id || e.id === currentUser?.id)) ||
+              (e.name && currentUser?.name && e.name.toLowerCase() === currentUser.name.toLowerCase())
+          );
+          setSelectedEmp(myMatch ? (myMatch._id || myMatch.id) : (data[0]._id || data[0].id));
         }
       }
     } catch (err) {
       console.error("Gagal load employees:", err);
+    } finally {
+      setIsLoadingEmployees(false);
     }
   };
 
   // Initial load
   useEffect(() => {
     fetchEmployees();
-  }, [isHR]);
+  }, [isHR, currentUser]);
 
   // Listen for avatar updates to refresh employee data (custom event)
   useEffect(() => {
@@ -223,20 +230,13 @@ export default function KpiTracking() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  const currentEmployee = isHR
-    ? employeesList.find((e) => (e._id || e.id) === selectedEmp) || employeesList[0] || {
-        id: currentUser?._id || currentUser?.id || "EMP-001",
-        name: currentUser?.name || "Admin HR",
-        role: "HR",
-      }
-    : {
-        id: currentUser?._id || currentUser?.id || "EMP-001",
-        _id: currentUser?._id || currentUser?.id || "EMP-001",
-        name: currentUser?.name || "Karyawan",
-        role: currentUser?.position || currentUser?.role || "Karyawan",
-      };
+  const currentEmployee = useMemo(() => {
+    if (employeesList.length === 0) return null;
+    const found = employeesList.find((e) => (e._id || e.id) === selectedEmp);
+    return found || employeesList[0] || null;
+  }, [employeesList, selectedEmp]);
 
-  const targetEmpId = currentEmployee._id || currentEmployee.id;
+  const targetEmpId = currentEmployee ? (currentEmployee._id || currentEmployee.id) : "";
   const monthNumber = MONTH_TABS.indexOf(activeTab) + 1;
 
   // Load evaluation from BE every time target employee, month, or year changes
@@ -244,24 +244,55 @@ export default function KpiTracking() {
     if (!targetEmpId) return;
     setIsLoadingEvaluation(true);
     try {
-      // Selalu panggil API dengan timestamp untuk data teraktual
-      const res = await kpiService.getKpiEvaluations({
-        empId: targetEmpId,
-        month: monthNumber,
-        year: Number(selectedYear),
-        _t: Date.now(),
-      });
-      const evalData = res?.data || res;
+      const [evalRes, taskRes] = await Promise.all([
+        kpiService.getKpiEvaluations({
+          empId: targetEmpId,
+          month: monthNumber,
+          year: Number(selectedYear),
+          _t: Date.now(),
+        }).catch(() => null),
+        taskService.getTasks({ _t: Date.now() }).catch(() => []),
+      ]);
+
+      const evalData = evalRes?.data || evalRes;
       setBeEvaluation(evalData);
 
+      // Hitung real Sprint Point dari tasks karyawan yang sebenarnya
+      const tasksList = Array.isArray(taskRes) ? taskRes : [];
+      const empIdStr = String(targetEmpId).toLowerCase();
+      const empEmailStr = (currentEmployee?.email || "").toLowerCase();
+      const empNameStr = (currentEmployee?.name || currentEmployee?.username || "").toLowerCase();
+
+      const empTasks = tasksList.filter((t) => {
+        if (!t) return false;
+        const aObj = typeof t.assignee === "object" ? t.assignee : null;
+        const eObj = typeof t.employee === "object" ? t.employee : null;
+
+        const aId = (aObj?._id || aObj?.id || "").toString().toLowerCase();
+        const eId = (eObj?._id || eObj?.id || "").toString().toLowerCase();
+        const aName = (aObj?.name || aObj?.username || (typeof t.assignee === "string" ? t.assignee : "")).toLowerCase();
+        const aEmail = (aObj?.email || "").toLowerCase();
+
+        return (
+          (empIdStr && (aId === empIdStr || eId === empIdStr || (typeof t.assignee === "string" && t.assignee.toLowerCase() === empIdStr))) ||
+          (empEmailStr && (aEmail === empEmailStr || aName.includes(empEmailStr))) ||
+          (empNameStr && (aName === empNameStr || aName.includes(empNameStr) || empNameStr.includes(aName)))
+        );
+      });
+
+      const realCalculatedSP = empTasks.reduce((acc, curr) => acc + (Number(curr.point) || 0), 0);
+      const totalEmpTasks = empTasks.length;
+      const doneEmpTasks = empTasks.filter((t) => t.status === "Done").length;
+      const calculatedOnTime = totalEmpTasks > 0 ? Math.round((doneEmpTasks / totalEmpTasks) * 10) : 0;
+
       if (evalData?.scores && Array.isArray(evalData.scores) && evalData.scores.length > 0) {
-        const newInputs = { ...DEFAULT_INPUTS };
+        const newInputs = { ...CLEAN_INPUTS };
         evalData.scores.forEach((s) => {
           const name = (s.indicatorName || "").toLowerCase();
           if (name.includes("sprint") || name.includes("story point")) {
-            newInputs[8] = { spEarned: s.actual || 0, spTarget: s.target || 88 };
+            newInputs[8] = { spEarned: s.actual || realCalculatedSP, spTarget: s.target || 88 };
           } else if (name.includes("on time") || name.includes("delivery")) {
-            const act = s.actual || 90;
+            const act = s.actual || (totalEmpTasks > 0 ? (doneEmpTasks / totalEmpTasks) * 100 : 90);
             newInputs[1] = { onTime: Math.round((act / 100) * 10), total: 10 };
           } else if (name.includes("sla") || name.includes("bug ticket")) {
             const act = s.actual || 90;
@@ -280,24 +311,34 @@ export default function KpiTracking() {
           try {
             setKpiInputs(JSON.parse(cached));
           } catch {
-            setKpiInputs(DEFAULT_INPUTS);
+            setKpiInputs({
+              ...CLEAN_INPUTS,
+              1: { onTime: calculatedOnTime, total: Math.max(totalEmpTasks, 10) },
+              8: { spEarned: realCalculatedSP, spTarget: 88 },
+            });
           }
         } else {
-          setKpiInputs(DEFAULT_INPUTS);
+          setKpiInputs({
+            ...CLEAN_INPUTS,
+            1: { onTime: calculatedOnTime, total: Math.max(totalEmpTasks, 10) },
+            8: { spEarned: realCalculatedSP, spTarget: 88 },
+          });
         }
       }
     } catch (err) {
       console.warn("Gagal load evaluasi dari BE:", err.message);
       setBeEvaluation(null);
-      setKpiInputs(DEFAULT_INPUTS);
+      setKpiInputs(CLEAN_INPUTS);
     } finally {
       setIsLoadingEvaluation(false);
     }
-  }, [targetEmpId, monthNumber, selectedYear]);
+  }, [targetEmpId, monthNumber, selectedYear, currentEmployee]);
 
   useEffect(() => {
-    loadKpiEvaluation();
-  }, [loadKpiEvaluation]);
+    if (targetEmpId) {
+      loadKpiEvaluation();
+    }
+  }, [targetEmpId, loadKpiEvaluation]);
 
   // Cegah pengetikan tanda minus, plus, atau exponential di input angka
   const handleKeyDownNonNegative = (e) => {
@@ -324,13 +365,13 @@ export default function KpiTracking() {
     });
   };
 
-  // Reset Input ke Nilai Standar
+  // Reset Input ke Nilai Bersih
   const handleResetInputs = () => {
-    setKpiInputs(DEFAULT_INPUTS);
+    setKpiInputs(CLEAN_INPUTS);
     if (targetEmpId) {
       localStorage.removeItem(`kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`);
     }
-    setExportNotification("Nilai input KPI berhasil di-reset ke nilai default!");
+    setExportNotification("Nilai input KPI berhasil di-reset!");
     setTimeout(() => setExportNotification(false), 3000);
   };
 
@@ -339,13 +380,13 @@ export default function KpiTracking() {
     const metrics = KPI_METRICS_TEMPLATE.map((kpi) => {
       let actual = "";
       let atPercent = "";
-      let achievedLevel = 4;
+      let achievedLevel = 1;
       const inp = inputs[kpi.no] || {};
 
       switch (kpi.no) {
         case 1: {
           const onTime = Number(inp.onTime) || 0;
-          const total = Number(inp.total) || 1;
+          const total = Number(inp.total) || 0;
           const percent = total > 0 ? (onTime / total) * 100 : 0;
           actual = `${percent.toFixed(1)}%`;
           atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
@@ -354,7 +395,7 @@ export default function KpiTracking() {
         }
         case 2: {
           const onSla = Number(inp.onSla) || 0;
-          const total = Number(inp.total) || 1;
+          const total = Number(inp.total) || 0;
           const percent = total > 0 ? (onSla / total) * 100 : 0;
           actual = `${percent.toFixed(1)}%`;
           atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
@@ -387,17 +428,17 @@ export default function KpiTracking() {
         case 6: {
           const hrs = Number(inp.hours) || 0;
           actual = `${hrs} Jam`;
-          atPercent = hrs > 0 ? `${((48 / hrs) * 100).toFixed(1)}%` : "100.0%";
-          achievedLevel = hrs < 48 ? 4 : hrs === 48 ? 3 : hrs <= 64 ? 2 : 1;
+          atPercent = hrs > 0 ? `${((48 / hrs) * 100).toFixed(1)}%` : "0.0%";
+          achievedLevel = hrs > 0 && hrs < 48 ? 4 : hrs === 48 ? 3 : hrs > 0 && hrs <= 64 ? 2 : 1;
           break;
         }
         case 7: {
           const rej = Number(inp.rejectCount) || 0;
-          const total = Number(inp.totalTasks) || 1;
+          const total = Number(inp.totalTasks) || 0;
           const percent = total > 0 ? (rej / total) * 100 : 0;
           actual = `${percent.toFixed(1)}%`;
-          atPercent = percent <= 20 ? "100.0%" : `${((30 / Math.max(percent, 1)) * 100).toFixed(1)}%`;
-          achievedLevel = percent < 20 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
+          atPercent = total === 0 ? "100.0%" : percent <= 20 ? "100.0%" : `${((30 / Math.max(percent, 1)) * 100).toFixed(1)}%`;
+          achievedLevel = total === 0 ? 4 : percent < 20 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
           break;
         }
         case 8: {
@@ -452,13 +493,19 @@ export default function KpiTracking() {
         year: "numeric",
       });
 
-      // Daftar seluruh karyawan yang akan diekspor
+      // Daftar seluruh karyawan yang akan diekspor (dari data nyata)
       const listToExport =
         Array.isArray(employeesList) && employeesList.length > 0
           ? employeesList
-          : Array.isArray(EMPLOYEES) && EMPLOYEES.length > 0
-          ? EMPLOYEES
-          : [currentEmployee || { name: currentUser?.name || "Karyawan", role: currentUser?.role || "Staff" }];
+          : currentEmployee
+          ? [currentEmployee]
+          : [];
+
+      if (listToExport.length === 0) {
+        setExportNotification("Tidak ada data karyawan untuk diekspor.");
+        setTimeout(() => setExportNotification(false), 3000);
+        return;
+      }
 
       const usedSheetNames = new Set();
       const summaryRows = [];
@@ -475,7 +522,7 @@ export default function KpiTracking() {
         const empDept = emp?.division || emp?.department || "Engineering";
 
         // Ambil input nilai KPI karyawan dari localStorage jika ada, atau gunakan default
-        let empInputs = DEFAULT_INPUTS;
+        let empInputs = CLEAN_INPUTS;
         try {
           const cached = localStorage.getItem(`kpi_inputs_${empId}_${monthNumber}_${selectedYear}`);
           if (cached) {
@@ -484,7 +531,7 @@ export default function KpiTracking() {
             empInputs = kpiInputs;
           }
         } catch {
-          empInputs = DEFAULT_INPUTS;
+          empInputs = CLEAN_INPUTS;
         }
 
         const { metrics: empMetrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(empInputs);
@@ -731,7 +778,8 @@ export default function KpiTracking() {
             {/* Tombol Buka Form Input Capaian KPI (Untuk Karyawan & HR) */}
             <button
               onClick={() => setIsInputModalOpen(true)}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              disabled={!currentEmployee}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <FaEdit /> Input Capaian KPI
             </button>
@@ -739,7 +787,8 @@ export default function KpiTracking() {
             {/* Tombol Export KPI (Format Excel Multi-Sheet) */}
             <button
               onClick={handleExportKPI}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              disabled={!currentEmployee}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer disabled:opacity-50"
               title={isHR ? "Unduh file laporan KPI seluruh sheet data karyawan" : "Unduh file laporan evaluasi KPI"}
             >
               <FaFileExport /> Export KPI
@@ -748,9 +797,9 @@ export default function KpiTracking() {
         </PageHeader>
 
         {/* State Loading Linear Saat Refresh / Ganti Karyawan */}
-        {isLoadingEvaluation && (
+        {(isLoadingEmployees || isLoadingEvaluation) && (
           <div className="mb-4">
-            <LinearLoading message={`Memuat data KPI terbaru untuk ${currentEmployee.name}...`} />
+            <LinearLoading message={isLoadingEmployees ? "Memuat data karyawan dari server..." : `Memuat data KPI terbaru untuk ${currentEmployee?.name || "Karyawan"}...`} />
           </div>
         )}
 
@@ -767,227 +816,242 @@ export default function KpiTracking() {
           </div>
         )}
 
-        {/* Info Top Banner & Karyawan Selector */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-primary-light text-primary flex items-center justify-center font-bold text-lg shrink-0">
-              <FaChartBar />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-gray-800 text-sm sm:text-base">{currentEmployee.name}</h3>
-                <span className="text-[10px] sm:text-xs bg-primary-light text-primary px-2.5 py-0.5 rounded-full font-semibold">
-                  {currentEmployee.role}
-                </span>
+        {isLoadingEmployees ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-3 my-6">
+            <FaSpinner className="animate-spin text-primary" size={28} />
+            <p className="text-sm font-bold text-gray-700">Menghubungkan ke server...</p>
+            <p className="text-xs text-gray-400">Mengambil daftar profil karyawan dan riwayat evaluasi KPI</p>
+          </div>
+        ) : !currentEmployee ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-3 my-6">
+            <p className="text-sm font-bold text-gray-700">Tidak ada data karyawan ditemukan.</p>
+            <p className="text-xs text-gray-400">Silakan tambahkan karyawan melalui menu Employee Directory.</p>
+          </div>
+        ) : (
+          <>
+            {/* Info Top Banner & Karyawan Selector */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-primary-light text-primary flex items-center justify-center font-bold text-lg shrink-0">
+                  <FaChartBar />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-gray-800 text-sm sm:text-base">{currentEmployee.name}</h3>
+                    <span className="text-[10px] sm:text-xs bg-primary-light text-primary px-2.5 py-0.5 rounded-full font-semibold">
+                      {currentEmployee.position || currentEmployee.role}
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Tahun: <b>{selectedYear}</b> • PT: <b>PT. JAGA</b> • Periode: <b>{activeTab}</b></p>
+                </div>
               </div>
-              <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Tahun: <b>{selectedYear}</b> • PT: <b>PT. JAGA</b> • Periode: <b>{activeTab}</b></p>
-            </div>
-          </div>
 
-          {/* Switcher Karyawan (Khusus HR bisa pilih karyawan) */}
-          {isHR && (
-            <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200">
-              <FaUserTie className="text-gray-400 text-sm ml-1 shrink-0" />
-              <span className="text-xs font-semibold text-gray-600 shrink-0">Pilih Karyawan:</span>
-              <select
-                value={selectedEmp}
-                onChange={(e) => setSelectedEmp(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs w-full"
-              >
-                {employeesList.map((emp) => (
-                  <option key={emp._id || emp.id} value={emp._id || emp.id}>
-                    {emp.name} ({emp.position || emp.role})
-                  </option>
+              {/* Switcher Karyawan (Khusus HR bisa pilih karyawan) */}
+              {isHR && (
+                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200">
+                  <FaUserTie className="text-gray-400 text-sm ml-1 shrink-0" />
+                  <span className="text-xs font-semibold text-gray-600 shrink-0">Pilih Karyawan:</span>
+                  <select
+                    value={selectedEmp}
+                    onChange={(e) => setSelectedEmp(e.target.value)}
+                    className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer shadow-2xs w-full"
+                  >
+                    {employeesList.map((emp) => (
+                      <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                        {emp.name} ({emp.position || emp.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Quick KPI Overview Cards (Terhitung Real-time dari Rumus) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-base shrink-0">
+                  <FaTrophy />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Rata-rata Capaian</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-800">Level {avgLevel}</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center text-base shrink-0">
+                  <FaBolt />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Total Bobot Metrik</p>
+                  <p className="text-base sm:text-lg font-extrabold text-gray-800">{totalWeight}%</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base shrink-0">
+                  <FaBullseye />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Target Level 4</p>
+                  <p className="text-base sm:text-lg font-extrabold text-green-600 truncate">{totalLevel4} dari {computedMetrics.length} Metrik</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base shrink-0">
+                  <FaChartLine />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Sprint Point</p>
+                  <p className="text-base sm:text-lg font-extrabold text-accent truncate">
+                    {kpiInputs[8]?.spEarned ?? 0} / {kpiInputs[8]?.spTarget ?? 88} SP
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* TAB BULAN & PILIHAN TAHUN */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-3 shadow-sm border border-gray-100 mb-6 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4">
+              {/* 10+ Tab Bulan (Januari - Desember) */}
+              <div className="min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full scrollbar-thin">
+                {MONTH_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${activeTab === tab
+                        ? "bg-primary text-white shadow-xs"
+                        : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                  >
+                    {tab}
+                  </button>
                 ))}
-              </select>
+              </div>
+
+              {/* Pilihan Tahun di Sebelah Kanan Bulanan - Tampilan Lebih Luas & Lega */}
+              <div className="flex items-center gap-2.5 bg-gray-50/90 hover:bg-gray-100/90 border border-gray-200 px-3.5 py-1.5 rounded-2xl shrink-0 transition-all shadow-2xs">
+                <FaCalendarAlt className="text-primary text-sm shrink-0" />
+                <span className="text-xs font-bold text-gray-700">Tahun:</span>
+
+                {/* Tombol Tahun Sebelumnya */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const curIdx = YEARS.indexOf(selectedYear);
+                    if (curIdx > 0) setSelectedYear(YEARS[curIdx - 1]);
+                  }}
+                  disabled={YEARS.indexOf(selectedYear) === 0}
+                  className="w-6 h-6 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-primary hover:border-primary flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+                  title="Tahun Sebelumnya"
+                >
+                  ‹
+                </button>
+
+                {/* Dropdown Pilihan Tahun Luas */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="bg-white border border-gray-300 text-xs font-extrabold text-primary rounded-xl px-3 py-1.5 min-w-[110px] text-center focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer shadow-2xs transition-all"
+                >
+                  {YEARS.map((y) => (
+                    <option key={y} value={y} className="font-semibold text-gray-800 text-xs">
+                      Tahun {y}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Tombol Tahun Berikutnya */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const curIdx = YEARS.indexOf(selectedYear);
+                    if (curIdx < YEARS.length - 1) setSelectedYear(YEARS[curIdx + 1]);
+                  }}
+                  disabled={YEARS.indexOf(selectedYear) === YEARS.length - 1}
+                  className="w-6 h-6 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-primary hover:border-primary flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
+                  title="Tahun Berikutnya"
+                >
+                  ›
+                </button>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Quick KPI Overview Cards (Terhitung Real-time dari Rumus) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center text-base shrink-0">
-              <FaTrophy />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Rata-rata Capaian</p>
-              <p className="text-base sm:text-lg font-extrabold text-gray-800">Level {avgLevel}</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center text-base shrink-0">
-              <FaBolt />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Total Bobot Metrik</p>
-              <p className="text-base sm:text-lg font-extrabold text-gray-800">{totalWeight}% (Lengkap)</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base shrink-0">
-              <FaBullseye />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Target Level 4</p>
-              <p className="text-base sm:text-lg font-extrabold text-green-600 truncate">{totalLevel4} dari {computedMetrics.length} Metrik</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base shrink-0">
-              <FaChartLine />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-gray-400 truncate">Sprint Point</p>
-              <p className="text-base sm:text-lg font-extrabold text-accent truncate">
-                {kpiInputs[8]?.spEarned ?? 98} / {kpiInputs[8]?.spTarget ?? 88} SP
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* TAB BULAN & PILIHAN TAHUN */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 shadow-sm border border-gray-100 mb-6 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4">
-          {/* 10+ Tab Bulan (Januari - Desember) */}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full scrollbar-thin">
-            {MONTH_TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${activeTab === tab
-                    ? "bg-primary text-white shadow-xs"
-                    : "text-gray-600 hover:bg-gray-100"
-                  }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Pilihan Tahun di Sebelah Kanan Bulanan - Tampilan Lebih Luas & Lega */}
-          <div className="flex items-center gap-2.5 bg-gray-50/90 hover:bg-gray-100/90 border border-gray-200 px-3.5 py-1.5 rounded-2xl shrink-0 transition-all shadow-2xs">
-            <FaCalendarAlt className="text-primary text-sm shrink-0" />
-            <span className="text-xs font-bold text-gray-700">Tahun:</span>
-
-            {/* Tombol Tahun Sebelumnya */}
-            <button
-              type="button"
-              onClick={() => {
-                const curIdx = YEARS.indexOf(selectedYear);
-                if (curIdx > 0) setSelectedYear(YEARS[curIdx - 1]);
-              }}
-              disabled={YEARS.indexOf(selectedYear) === 0}
-              className="w-6 h-6 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-primary hover:border-primary flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
-              title="Tahun Sebelumnya"
-            >
-              ‹
-            </button>
-
-            {/* Dropdown Pilihan Tahun Luas */}
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-white border border-gray-300 text-xs font-extrabold text-primary rounded-xl px-3 py-1.5 min-w-[110px] text-center focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer shadow-2xs transition-all"
-            >
-              {YEARS.map((y) => (
-                <option key={y} value={y} className="font-semibold text-gray-800 text-xs">
-                  Tahun {y}
-                </option>
-              ))}
-            </select>
-
-            {/* Tombol Tahun Berikutnya */}
-            <button
-              type="button"
-              onClick={() => {
-                const curIdx = YEARS.indexOf(selectedYear);
-                if (curIdx < YEARS.length - 1) setSelectedYear(YEARS[curIdx + 1]);
-              }}
-              disabled={YEARS.indexOf(selectedYear) === YEARS.length - 1}
-              className="w-6 h-6 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-primary hover:border-primary flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
-              title="Tahun Berikutnya"
-            >
-              ›
-            </button>
-          </div>
-        </div>
-
-        {/* TABEL UTAMA EVALUASI KPI (8 INDIKATOR) */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse min-w-[950px]">
-              <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-200/80 text-gray-500 font-bold uppercase text-[10px] tracking-wider">
-                  <th className="py-3.5 px-3 text-center w-10">No</th>
-                  <th className="py-3.5 px-3 w-40">Perspektif</th>
-                  <th className="py-3.5 px-4 w-64">Sasaran Strategis & Nama KPI</th>
-                  <th className="py-3.5 px-3 text-center w-24">Target</th>
-                  <th className="py-3.5 px-3 text-center w-16">Bobot</th>
-                  <th className="py-3.5 px-3 text-center w-24">Realisasi</th>
-                  <th className="py-3.5 px-3 text-center w-20">% Capaian</th>
-                  <th className="py-3.5 px-3 text-center w-24">Level</th>
-                  <th className="py-3.5 px-3 text-center w-20">Skor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {computedMetrics.map((m) => {
-                  const score = ((m.weight * m.achievedLevel) / 4).toFixed(1);
-                  return (
-                    <tr key={m.no} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3.5 px-3 text-center font-bold text-gray-400 text-[11px]">{m.no}</td>
-                      <td className="py-3.5 px-3">
-                        <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-xl border ${m.categoryBg}`}>
-                          {m.category}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <p className="font-bold text-gray-900 text-xs">{m.kpiName}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{m.description}</p>
-                      </td>
-                      <td className="py-3.5 px-3 text-center font-semibold text-gray-700">{m.monthlyTarget}</td>
-                      <td className="py-3.5 px-3 text-center font-bold text-gray-800">{m.weight}%</td>
-                      <td className="py-3.5 px-3 text-center font-bold text-primary bg-primary-light/20 rounded-xl">
-                        {m.actual}
-                      </td>
-                      <td className="py-3.5 px-3 text-center font-bold text-gray-700">{m.atPercent}</td>
-                      <td className="py-3.5 px-3 text-center">
-                        <span className={`inline-flex items-center justify-center font-bold text-xs px-2.5 py-1 rounded-xl shadow-2xs ${
-                          m.achievedLevel === 4
-                            ? "bg-green-100 text-green-700 border border-green-200"
-                            : m.achievedLevel === 3
-                            ? "bg-blue-100 text-blue-700 border border-blue-200"
-                            : m.achievedLevel === 2
-                            ? "bg-amber-100 text-amber-700 border border-amber-200"
-                            : "bg-rose-100 text-rose-700 border border-rose-200"
-                        }`}>
-                          Level {m.achievedLevel}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-center font-extrabold text-gray-900">{score}</td>
+            {/* TABEL UTAMA EVALUASI KPI (8 INDIKATOR) */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse min-w-[950px]">
+                  <thead>
+                    <tr className="bg-gray-50/80 border-b border-gray-200/80 text-gray-500 font-bold uppercase text-[10px] tracking-wider">
+                      <th className="py-3.5 px-3 text-center w-10">No</th>
+                      <th className="py-3.5 px-3 w-40">Perspektif</th>
+                      <th className="py-3.5 px-4 w-64">Sasaran Strategis & Nama KPI</th>
+                      <th className="py-3.5 px-3 text-center w-24">Target</th>
+                      <th className="py-3.5 px-3 text-center w-16">Bobot</th>
+                      <th className="py-3.5 px-3 text-center w-24">Realisasi</th>
+                      <th className="py-3.5 px-3 text-center w-20">% Capaian</th>
+                      <th className="py-3.5 px-3 text-center w-24">Level</th>
+                      <th className="py-3.5 px-3 text-center w-20">Skor</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50/90 font-bold text-xs text-gray-800 border-t-2 border-gray-200">
-                  <td colSpan={4} className="py-3.5 px-4 text-right">TOTAL BOBOT & RATA-RATA CAPAIAN:</td>
-                  <td className="py-3.5 px-3 text-center text-primary font-extrabold">{totalWeight}%</td>
-                  <td colSpan={2} className="py-3.5 px-3 text-center text-gray-500">Predikat: <b>{calculateMetricsForInputs(kpiInputs).predicate}</b></td>
-                  <td className="py-3.5 px-3 text-center text-green-700 font-extrabold">Level {avgLevel}</td>
-                  <td className="py-3.5 px-3 text-center text-primary font-black">
-                    {computedMetrics.reduce((acc, m) => acc + (m.weight * m.achievedLevel) / 4, 0).toFixed(1)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {computedMetrics.map((m) => {
+                      const score = ((m.weight * m.achievedLevel) / 4).toFixed(1);
+                      return (
+                        <tr key={m.no} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="py-3.5 px-3 text-center font-bold text-gray-400 text-[11px]">{m.no}</td>
+                          <td className="py-3.5 px-3">
+                            <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-xl border ${m.categoryBg}`}>
+                              {m.category}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-gray-900 text-xs">{m.kpiName}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{m.description}</p>
+                          </td>
+                          <td className="py-3.5 px-3 text-center font-semibold text-gray-700">{m.monthlyTarget}</td>
+                          <td className="py-3.5 px-3 text-center font-bold text-gray-800">{m.weight}%</td>
+                          <td className="py-3.5 px-3 text-center font-bold text-primary bg-primary-light/20 rounded-xl">
+                            {m.actual}
+                          </td>
+                          <td className="py-3.5 px-3 text-center font-bold text-gray-700">{m.atPercent}</td>
+                          <td className="py-3.5 px-3 text-center">
+                            <span className={`inline-flex items-center justify-center font-bold text-xs px-2.5 py-1 rounded-xl shadow-2xs ${
+                              m.achievedLevel === 4
+                                ? "bg-green-100 text-green-700 border border-green-200"
+                                : m.achievedLevel === 3
+                                ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                : m.achievedLevel === 2
+                                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                : "bg-rose-100 text-rose-700 border border-rose-200"
+                            }`}>
+                              Level {m.achievedLevel}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-center font-extrabold text-gray-900">{score}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50/90 font-bold text-xs text-gray-800 border-t-2 border-gray-200">
+                      <td colSpan={4} className="py-3.5 px-4 text-right">TOTAL BOBOT & RATA-RATA CAPAIAN:</td>
+                      <td className="py-3.5 px-3 text-center text-primary font-extrabold">{totalWeight}%</td>
+                      <td colSpan={2} className="py-3.5 px-3 text-center text-gray-500">Predikat: <b>{calculateMetricsForInputs(kpiInputs).predicate}</b></td>
+                      <td className="py-3.5 px-3 text-center text-green-700 font-extrabold">Level {avgLevel}</td>
+                      <td className="py-3.5 px-3 text-center text-primary font-black">
+                        {computedMetrics.reduce((acc, m) => acc + (m.weight * m.achievedLevel) / 4, 0).toFixed(1)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* MODAL: INPUT CAPAIAN KPI KARYAWAN */}
-        {isInputModalOpen && (
+        {isInputModalOpen && currentEmployee && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
@@ -1027,7 +1091,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[1]?.onTime ?? 9}
+                          value={kpiInputs[1]?.onTime ?? 0}
                           onChange={(e) => handleInputChange(1, "onTime", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1038,7 +1102,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[1]?.total ?? 10}
+                          value={kpiInputs[1]?.total ?? 0}
                           onChange={(e) => handleInputChange(1, "total", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1066,7 +1130,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[2]?.onSla ?? 19}
+                          value={kpiInputs[2]?.onSla ?? 0}
                           onChange={(e) => handleInputChange(2, "onSla", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1077,7 +1141,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[2]?.total ?? 20}
+                          value={kpiInputs[2]?.total ?? 0}
                           onChange={(e) => handleInputChange(2, "total", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1104,7 +1168,7 @@ export default function KpiTracking() {
                         type="number"
                         min="0"
                         onKeyDown={handleKeyDownNonNegative}
-                        value={kpiInputs[3]?.bugCount ?? 2}
+                        value={kpiInputs[3]?.bugCount ?? 0}
                         onChange={(e) => handleInputChange(3, "bugCount", e.target.value)}
                         className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                       />
@@ -1130,7 +1194,7 @@ export default function KpiTracking() {
                         type="number"
                         min="0"
                         onKeyDown={handleKeyDownNonNegative}
-                        value={kpiInputs[4]?.count ?? 3}
+                        value={kpiInputs[4]?.count ?? 0}
                         onChange={(e) => handleInputChange(4, "count", e.target.value)}
                         className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                       />
@@ -1195,7 +1259,7 @@ export default function KpiTracking() {
                         type="number"
                         min="0"
                         onKeyDown={handleKeyDownNonNegative}
-                        value={kpiInputs[6]?.hours ?? 36}
+                        value={kpiInputs[6]?.hours ?? 0}
                         onChange={(e) => handleInputChange(6, "hours", e.target.value)}
                         className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                       />
@@ -1222,7 +1286,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[7]?.rejectCount ?? 2}
+                          value={kpiInputs[7]?.rejectCount ?? 0}
                           onChange={(e) => handleInputChange(7, "rejectCount", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1233,7 +1297,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[7]?.totalTasks ?? 15}
+                          value={kpiInputs[7]?.totalTasks ?? 0}
                           onChange={(e) => handleInputChange(7, "totalTasks", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1261,7 +1325,7 @@ export default function KpiTracking() {
                           type="number"
                           min="0"
                           onKeyDown={handleKeyDownNonNegative}
-                          value={kpiInputs[8]?.spEarned ?? 98}
+                          value={kpiInputs[8]?.spEarned ?? 0}
                           onChange={(e) => handleInputChange(8, "spEarned", e.target.value)}
                           className="w-full mt-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-800 text-xs focus:ring-2 focus:ring-primary-light"
                         />
@@ -1292,7 +1356,7 @@ export default function KpiTracking() {
                   onClick={handleResetInputs}
                   className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer"
                 >
-                  Reset ke Standar
+                  Reset Nilai
                 </button>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
