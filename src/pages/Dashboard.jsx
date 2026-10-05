@@ -19,6 +19,7 @@ import {
 import Header from "../layouts/Header";
 import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
+import LinearLoading from "../components/LinearLoading";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { dashboardService } from "../services/dashboardService";
@@ -170,6 +171,13 @@ export default function Dashboard() {
             </span>
           )}
         </PageHeader>
+
+        {/* State Loading Linear Dashboard */}
+        {isLoading && (
+          <div className="mb-4">
+            <LinearLoading message="Memuat data tugas dan ringkasan performa dashboard..." />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Stat cards */}

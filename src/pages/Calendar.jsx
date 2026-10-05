@@ -32,6 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { taskService } from "../services/taskService";
 import { calendarService } from "../services/calendarService";
 import { employeeService } from "../services/employeeService";
+import LinearLoading from "../components/LinearLoading";
 
 const DAYS_OF_WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MONTH_NAMES = [
@@ -408,6 +409,13 @@ export default function CalendarPage() {
           collapsed ? "lg:ml-20" : "lg:ml-64"
         }`}
       >
+        {/* State Loading Linear Kalender */}
+        {isLoading && (
+          <div className="mb-2 shrink-0">
+            <LinearLoading message="Memuat jadwal kalender dan deadline tugas sprint..." />
+          </div>
+        )}
+
         {/* Header Kalender & Filter Toolbar */}
         <div className="shrink-0 flex flex-col gap-3 mb-3 sm:mb-4">
           {/* Baris 1: Judul + Pemilih Bulan & Tahun Rapi + Navigasi */}

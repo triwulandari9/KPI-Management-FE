@@ -19,6 +19,7 @@ import {
 import Header from "../layouts/Header";
 import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
+import LinearLoading from "../components/LinearLoading";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { employeeService } from "../services/employeeService";
@@ -29,6 +30,7 @@ export default function Employees() {
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
   const [employees, setEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -393,6 +395,13 @@ export default function Employees() {
             </button>
           )}
         </PageHeader>
+
+        {/* State Loading Linear Data Karyawan */}
+        {isLoading && (
+          <div className="mb-4">
+            <LinearLoading message="Memuat daftar karyawan dan menyinkronkan data profil dari server..." />
+          </div>
+        )}
 
         {/* Filter Toolbar */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  FaFileExcel,
+  FaFilePdf,
   FaUserTie,
   FaCheckCircle,
   FaTimes,
@@ -18,12 +18,13 @@ import {
 import Header from "../layouts/Header";
 import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
+import LinearLoading from "../components/LinearLoading";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { kpiService } from "../services/kpiService";
 import { employeeService } from "../services/employeeService";
-import * as XLSX from "xlsx";
-
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Daftar 10+ Tab Bulan / Periode
 const MONTH_TABS = [
@@ -154,7 +155,7 @@ const KPI_METRICS_TEMPLATE = [
     categoryBg: "bg-emerald-100 text-emerald-800 border-emerald-200",
     objective: "Akuisisi dan live produk utama klinik sesuai target",
     kpiName: "Sprint Point (SP)",
-    description: "Total akumulasi Story Point yang berhasil dicapai.",
+    description: "Total akumulasi Story Point yang berhasil dicapai (Tingkat Keaktifan & Produktivitas).",
     formulaText: "(Total SP Berhasil Tercapai ÷ Target SP Bulanan) × 100%",
     frequency: "Yearly",
     weight: 15,
@@ -239,30 +240,22 @@ export default function KpiTracking() {
   const targetEmpId = currentEmployee._id || currentEmployee.id;
   const monthNumber = MONTH_TABS.indexOf(activeTab) + 1;
 
-  // Load evaluation from BE
+  // Load evaluation from BE every time target employee, month, or year changes
   const loadKpiEvaluation = useCallback(async () => {
     if (!targetEmpId) return;
     setIsLoadingEvaluation(true);
     try {
-      const cacheKey = `kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          setKpiInputs(JSON.parse(cached));
-        } catch {
-          // ignore error
-        }
-      }
-
+      // Selalu panggil API dengan timestamp untuk data teraktual
       const res = await kpiService.getKpiEvaluations({
         empId: targetEmpId,
         month: monthNumber,
         year: Number(selectedYear),
+        _t: Date.now(),
       });
       const evalData = res?.data || res;
       setBeEvaluation(evalData);
 
-      if (evalData?.scores && Array.isArray(evalData.scores) && !cached) {
+      if (evalData?.scores && Array.isArray(evalData.scores) && evalData.scores.length > 0) {
         const newInputs = { ...DEFAULT_INPUTS };
         evalData.scores.forEach((s) => {
           const name = (s.indicatorName || "").toLowerCase();
@@ -280,10 +273,24 @@ export default function KpiTracking() {
           }
         });
         setKpiInputs(newInputs);
+      } else {
+        // Cek jika ada input tersimpan lokal khusus karyawan ini
+        const cacheKey = `kpi_inputs_${targetEmpId}_${monthNumber}_${selectedYear}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            setKpiInputs(JSON.parse(cached));
+          } catch {
+            setKpiInputs(DEFAULT_INPUTS);
+          }
+        } else {
+          setKpiInputs(DEFAULT_INPUTS);
+        }
       }
     } catch (err) {
       console.warn("Gagal load evaluasi dari BE:", err.message);
       setBeEvaluation(null);
+      setKpiInputs(DEFAULT_INPUTS);
     } finally {
       setIsLoadingEvaluation(false);
     }
@@ -292,6 +299,7 @@ export default function KpiTracking() {
   useEffect(() => {
     loadKpiEvaluation();
   }, [loadKpiEvaluation]);
+
 
   // Cegah pengetikan tanda minus, plus, atau exponential di input angka
   const handleKeyDownNonNegative = (e) => {
@@ -437,275 +445,158 @@ export default function KpiTracking() {
   ).toFixed(1);
   const totalLevel4 = computedMetrics.filter((m) => m.achievedLevel === 4).length;
 
-  // Unduh File Excel (.xlsx) Multi-Sheet Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
-  const handleDownloadExcel = () => {
+  // Unduh File PDF Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
+  const handleDownloadPDF = () => {
     try {
-      const wb = XLSX.utils.book_new();
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
       const printDateStr = new Date().toLocaleDateString("id-ID", {
         day: "numeric",
         month: "long",
         year: "numeric",
       });
 
-      // Daftar seluruh karyawan yang akan diekspor
-      const listToExport =
-        Array.isArray(employeesList) && employeesList.length > 0
-          ? employeesList
-          : Array.isArray(EMPLOYEES) && EMPLOYEES.length > 0
-          ? EMPLOYEES
-          : [currentEmployee || { name: currentUser?.name || "Karyawan", role: currentUser?.role || "Staff" }];
+      const empName = currentEmployee?.name || currentUser?.name || "Karyawan";
+      const empId = currentEmployee?.id || currentEmployee?._id || "EMP-001";
+      const empRole = currentEmployee?.role || currentEmployee?.position || "Software Engineer";
+      const empDept = currentEmployee?.division || currentEmployee?.department || "Engineering";
 
-      const usedSheetNames = new Set();
-      const summaryRows = [];
+      const { metrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(kpiInputs);
 
-      // =========================================================================
-      // 1. GENERATE INDIVIDUAL EMPLOYEE SHEETS & COLLECT DATA FOR SUMMARY
-      // =========================================================================
-      const employeeSheets = [];
+      // Header Brand
+      doc.setFillColor(45, 99, 177); // Primary Blue #2D63B1
+      doc.rect(0, 0, 297, 24, "F");
 
-      listToExport.forEach((emp, index) => {
-        const empName = emp?.name || emp?.fullName || emp?.username || `Karyawan ${index + 1}`;
-        const empId = emp?.id || emp?._id || `EMP-${String(index + 1).padStart(3, "0")}`;
-        const empRole = emp?.role || emp?.position || emp?.jobTitle || "Software Engineer";
-        const empDept = emp?.division || emp?.department || "Engineering";
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)", 14, 11);
 
-        // Ambil input nilai KPI karyawan dari localStorage jika ada, atau gunakan default
-        let empInputs = DEFAULT_INPUTS;
-        try {
-          const cached = localStorage.getItem(`kpi_inputs_${empId}_${monthNumber}_${selectedYear}`);
-          if (cached) {
-            empInputs = JSON.parse(cached);
-          } else if (empId === targetEmpId) {
-            empInputs = kpiInputs;
-          }
-        } catch {
-          empInputs = DEFAULT_INPUTS;
-        }
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("LAPORAN EVALUASI CAPAIAN KEY PERFORMANCE INDICATOR (KPI)", 14, 18);
 
-        const { metrics: empMetrics, weightSum, averageLevel, predicate } = calculateMetricsForInputs(empInputs);
+      doc.setFontSize(8);
+      doc.text(`Dicetak: ${printDateStr}`, 283, 15, { align: "right" });
 
-        // Kumpulkan ke ringkasan
-        summaryRows.push([
-          index + 1,
-          empName,
-          empId,
-          empDept,
-          empRole,
-          `${weightSum}%`,
-          `Level ${averageLevel}`,
-          predicate,
-          "Terverifikasi",
-        ]);
+      // Employee Information Box
+      doc.setDrawColor(220, 225, 230);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, 28, 269, 22, 2, 2, "FD");
 
-        // Struktur Sheet Detail Karyawan
-        const sheetData = [
-          ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
-          ["LAPORAN EVALUASI CAPAIAN KEY PERFORMANCE INDICATOR (KPI)"],
-          [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
-          [""],
-          ["INFORMASI KARYAWAN:"],
-          ["Nama Karyawan", empName, "", "ID / NIK", empId, "", "Periode", `${activeTab} ${selectedYear}`],
-          ["Jabatan / Posisi", empRole, "", "Divisi / Departemen", empDept, "", "Tanggal Cetak", printDateStr],
-          [""],
+      doc.setTextColor(51, 65, 85);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("INFORMASI KARYAWAN & PERIODE PENILAIAN", 18, 34);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Nama Karyawan : ${empName}`, 18, 41);
+      doc.text(`ID / NIP       : ${empId}`, 18, 46);
+
+      doc.text(`Divisi / Dept  : ${empDept}`, 105, 41);
+      doc.text(`Posisi / Role  : ${empRole}`, 105, 46);
+
+      doc.text(`Periode Bulan  : ${activeTab}`, 190, 41);
+      doc.text(`Tahun Evaluasi : ${selectedYear}`, 190, 46);
+
+      // Summary KPI Badges Box
+      doc.setFillColor(234, 241, 250); // primary light
+      doc.roundedRect(14, 53, 269, 14, 2, 2, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(45, 99, 177);
+      doc.text(`Rata-Rata Capaian: Level ${averageLevel}`, 20, 62);
+      doc.text(`Predikat Kinerja: ${predicate}`, 90, 62);
+      doc.text(`Total Bobot Metrik: ${weightSum}%`, 175, 62);
+      doc.text("Status: Terverifikasi Sistem", 240, 62);
+
+      // Table of KPI Metrics
+      const tableData = metrics.map((m) => [
+        m.no,
+        m.category,
+        m.kpiName,
+        m.monthlyTarget,
+        `${m.weight}%`,
+        m.actual,
+        m.atPercent,
+        `Level ${m.achievedLevel}`,
+        `${((m.weight * m.achievedLevel) / 4).toFixed(1)}`,
+      ]);
+
+      autoTable(doc, {
+        startY: 70,
+        head: [
           [
             "No",
-            "Category",
-            "Strategy Objective",
-            "KPI Name",
-            "KPI Description & Rumus",
-            "Frequency",
-            "Bobot (%)",
-            "Monthly Target",
-            "Actual",
-            "A/T (%)",
-            "Achieved Level",
-            "Rubrik Level 1",
-            "Rubrik Level 2",
-            "Rubrik Level 3",
-            "Rubrik Level 4",
+            "Perspektif",
+            "Sasaran / Nama Indikator KPI",
+            "Target",
+            "Bobot",
+            "Realisasi",
+            "% Capaian",
+            "Level",
+            "Skor",
           ],
-        ];
-
-        // Baris Data KPI Karyawan
-        empMetrics.forEach((k) => {
-          sheetData.push([
-            k.no,
-            k.category,
-            k.objective,
-            k.kpiName,
-            k.description,
-            k.frequency,
-            `${k.weight}%`,
-            k.monthlyTarget || "-",
-            k.actual || "-",
-            k.atPercent || "-",
-            `Level ${k.achievedLevel || 1}`,
-            k.levels?.l1 || "-",
-            k.levels?.l2 || "-",
-            k.levels?.l3 || "-",
-            k.levels?.l4 || "-",
-          ]);
-        });
-
-        // Baris Total & Predikat Evaluasi
-        sheetData.push([""]);
-        sheetData.push([
-          "TOTAL BOBOT:",
-          "",
-          "",
-          "",
-          "",
-          "",
-          `${weightSum}%`,
-          "",
-          "RATA-RATA LEVEL:",
-          `Level ${averageLevel} / 4.0`,
-          "",
-          "PREDIKAT EVALUASI:",
-          predicate,
-          "",
-          "",
-        ]);
-        sheetData.push([""]);
-
-        // Lembar Tanda Tangan Resmi
-        sheetData.push(["LEMBAR PENGESAHAN & PERSETUJUAN"]);
-        sheetData.push([
-          "Dibuat Oleh (Karyawan):",
-          "",
-          "",
-          "Ditinjau Oleh (Atasan Langsung):",
-          "",
-          "",
-          "",
-          "Disetujui Oleh (HR Department):",
-        ]);
-        sheetData.push([""]);
-        sheetData.push([""]);
-        sheetData.push([
-          `(${empName})`,
-          "",
-          "",
-          "(Product Owner / Lead)",
-          "",
-          "",
-          "",
-          "(HR Manager - PT Jaga Anugerah Giat Asa)",
-        ]);
-        sheetData.push([
-          `Jabatan: ${empRole}`,
-          "",
-          "",
-          "Jabatan: Team Lead / PO",
-          "",
-          "",
-          "",
-          "PT. Jaga Anugerah Giat Asa (Assist.id)",
-        ]);
-
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-        // Lebar Kolom yang Nyaman Dibaca di Excel
-        ws["!cols"] = [
-          { wch: 6 },   // No
-          { wch: 22 },  // Category
-          { wch: 32 },  // Strategy Objective
-          { wch: 28 },  // KPI Name
-          { wch: 48 },  // KPI Description & Rumus
-          { wch: 12 },  // Frequency
-          { wch: 12 },  // Bobot (%)
-          { wch: 16 },  // Monthly Target
-          { wch: 14 },  // Actual
-          { wch: 12 },  // A/T (%)
-          { wch: 16 },  // Achieved Level
-          { wch: 16 },  // Level 1
-          { wch: 16 },  // Level 2
-          { wch: 16 },  // Level 3
-          { wch: 16 },  // Level 4
-        ];
-
-        // Nama Sheet yang Unik & Bersih
-        let cleanSheetName = String(empName).replace(/[:\\/?*[\]]/g, "").trim() || `Karyawan_${index + 1}`;
-        cleanSheetName = cleanSheetName.substring(0, 26);
-
-        let finalSheetName = cleanSheetName;
-        let counter = 1;
-        while (usedSheetNames.has(finalSheetName.toLowerCase())) {
-          finalSheetName = `${cleanSheetName.substring(0, 23)}_${counter}`;
-          counter++;
-        }
-        usedSheetNames.add(finalSheetName.toLowerCase());
-
-        employeeSheets.push({ ws, name: finalSheetName });
+        ],
+        body: tableData,
+        theme: "striped",
+        headStyles: {
+          fillColor: [45, 99, 177],
+          textColor: [255, 255, 255],
+          fontSize: 7.5,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        bodyStyles: {
+          fontSize: 7,
+          textColor: [30, 41, 59],
+        },
+        columnStyles: {
+          0: { halign: "center", cellWidth: 10 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 80 },
+          3: { halign: "center", cellWidth: 24 },
+          4: { halign: "center", cellWidth: 16 },
+          5: { halign: "center", cellWidth: 24 },
+          6: { halign: "center", cellWidth: 24 },
+          7: { halign: "center", cellWidth: 20 },
+          8: { halign: "center", cellWidth: 16 },
+        },
+        margin: { left: 14, right: 14 },
       });
 
-      // =========================================================================
-      // 2. SHEET 1: REKAPITULASI SEMUA KARYAWAN (SUMMARY SHEET)
-      // =========================================================================
-      const summarySheetData = [
-        ["PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)"],
-        ["REKAPITULASI LAPORAN EVALUASI CAPAIAN KPI SELURUH KARYAWAN"],
-        [`PERIODE EVALUASI: ${activeTab.toUpperCase()} ${selectedYear}`],
-        [`Tanggal Export: ${printDateStr} • Total Karyawan: ${listToExport.length} Orang`],
-        [""],
-        [
-          "No",
-          "Nama Karyawan",
-          "ID / NIK",
-          "Divisi / Departemen",
-          "Jabatan / Posisi",
-          "Total Bobot",
-          "Rata-rata Capaian",
-          "Predikat Kinerja",
-          "Status Evaluasi",
-        ],
-        ...summaryRows,
-        [""],
-        [
-          "TOTAL KARYAWAN DIEVALUASI:",
-          `${listToExport.length} Orang`,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "PT. Jaga Anugerah Giat Asa",
-        ],
-      ];
+      // Signature / Approval Section
+      const finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || 160;
+      const sigY = Math.min(finalY + 12, 175);
 
-      const summaryWs = XLSX.utils.aoa_to_sheet(summarySheetData);
-      summaryWs["!cols"] = [
-        { wch: 6 },   // No
-        { wch: 28 },  // Nama Karyawan
-        { wch: 14 },  // ID / NIK
-        { wch: 22 },  // Divisi
-        { wch: 26 },  // Jabatan
-        { wch: 14 },  // Total Bobot
-        { wch: 20 },  // Rata-rata Capaian
-        { wch: 22 },  // Predikat Kinerja
-        { wch: 18 },  // Status Evaluasi
-      ];
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
 
-      // Masukkan Sheet Rekapitulasi di urutan pertama (Sheet 1)
-      XLSX.utils.book_append_sheet(wb, summaryWs, "REKAPITULASI");
+      doc.text("Karyawan Yang Dinilai,", 35, sigY);
+      doc.line(35, sigY + 16, 75, sigY + 16);
+      doc.text(`( ${empName} )`, 35, sigY + 20);
 
-      // Masukkan Sheet masing-masing karyawan berikutnya
-      employeeSheets.forEach(({ ws, name }) => {
-        XLSX.utils.book_append_sheet(wb, ws, name);
-      });
+      doc.text("Disetujui Oleh (Atasan / HR),", 220, sigY);
+      doc.line(220, sigY + 16, 260, sigY + 16);
+      doc.text("( Human Resources / Lead )", 220, sigY + 20);
 
-      // Unduh File Excel dengan Nama Resmi Perusahaan & Periode
-      const fileName = `Laporan_KPI_PT_Jaga_Anugerah_Giat_Asa_AssistID_${activeTab}_${selectedYear}.xlsx`;
+      const fileName = `Laporan_KPI_${empName.replace(/\s+/g, "_")}_${activeTab}_${selectedYear}.pdf`;
+      doc.save(fileName);
 
-      XLSX.writeFile(wb, fileName);
       setExportNotification(
-        `File Excel Laporan KPI PT. Jaga Anugerah Giat Asa (Assist.id) Periode ${activeTab} ${selectedYear} (${listToExport.length + 1} Sheet) berhasil diunduh!`
+        `File PDF Laporan KPI ${empName} (${activeTab} ${selectedYear}) berhasil diunduh!`
       );
       setTimeout(() => setExportNotification(false), 4500);
     } catch (err) {
-      console.error("Gagal export excel:", err);
-      setExportNotification(`Gagal mengunduh file Excel: ${err?.message || "Terjadi kesalahan sistem"}`);
+      console.error("Gagal export PDF:", err);
+      setExportNotification(`Gagal mengunduh file PDF: ${err?.message || "Terjadi kesalahan"}`);
       setTimeout(() => setExportNotification(false), 5000);
     }
   };
@@ -732,14 +623,21 @@ export default function KpiTracking() {
 
             {/* Tombol Export Excel */}
             <button
-              onClick={handleDownloadExcel}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
-              title={isHR ? "Unduh file Excel berisi semua sheet data KPI karyawan" : "Unduh file Excel laporan KPI"}
+              onClick={handleDownloadPDF}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer"
+              title="Unduh file PDF resmi laporan KPI karyawan"
             >
-              <FaFileExcel /> Export Excel
+              <FaFilePdf /> Export PDF
             </button>
           </div>
         </PageHeader>
+
+        {/* State Loading Linear Saat Refresh / Ganti Karyawan */}
+        {isLoadingEvaluation && (
+          <div className="mb-4">
+            <LinearLoading message={`Memuat data KPI terbaru untuk ${currentEmployee.name}...`} />
+          </div>
+        )}
 
         {/* Notifikasi Pop-up */}
         {exportNotification && (

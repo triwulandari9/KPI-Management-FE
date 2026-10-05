@@ -28,6 +28,7 @@ import {
 import Header from "../layouts/Header";
 import Sidebar from "../layouts/Sidebar";
 import PageHeader from "../layouts/PageHeader";
+import LinearLoading from "../components/LinearLoading";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { taskService } from "../services/taskService";
@@ -88,6 +89,7 @@ export default function Tasks() {
   const currentUserId = currentUser?._id || currentUser?.id;
 
   const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -127,14 +129,17 @@ export default function Tasks() {
 
   // Fungsi refresh / get task dari backend secara langsung
   const fetchTasks = async () => {
+    setIsLoading(true);
     try {
-      const tasksData = await taskService.getTasks();
+      const tasksData = await taskService.getTasks({ _t: Date.now() });
       if (tasksData && Array.isArray(tasksData)) {
         setTasks(tasksData);
         return tasksData;
       }
     } catch (err) {
       console.error("Gagal refresh data tasks:", err);
+    } finally {
+      setIsLoading(false);
     }
     return null;
   };
@@ -142,10 +147,11 @@ export default function Tasks() {
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
+      setIsLoading(true);
       try {
         const [tasksData, employeesData] = await Promise.all([
-          taskService.getTasks().catch(() => []),
-          employeeService.getEmployees().catch(() => []),
+          taskService.getTasks({ _t: Date.now() }).catch(() => []),
+          employeeService.getEmployees({ _t: Date.now() }).catch(() => []),
         ]);
         if (isMounted) {
           if (tasksData && Array.isArray(tasksData)) {
@@ -157,6 +163,8 @@ export default function Tasks() {
         }
       } catch (err) {
         console.error("Gagal load data tasks & employees:", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
     loadData();
@@ -634,7 +642,10 @@ export default function Tasks() {
       <Sidebar />
 
       <main className={`transition-all duration-300 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 ${collapsed ? "lg:ml-20" : "lg:ml-64"}`}>
-        <PageHeader title="Task Management" subtitle="Kelola dan pantau alur tugas sprint harian">
+        <PageHeader
+          title="Task Management"
+          subtitle="Kelola dan pantau alur tugas sprint harian • Sprint Point (SP) menunjukkan seberapa aktif dan produktif karyawan"
+        >
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 shadow-2xs">
               <FaShieldAlt className={isPO ? "text-amber-500" : isHR ? "text-purple-500" : "text-primary"} />
@@ -651,6 +662,28 @@ export default function Tasks() {
             </button>
           </div>
         </PageHeader>
+
+        {/* State Loading Linear Saat Refresh / Sinkronisasi Tasks */}
+        {isLoading && (
+          <div className="mb-4">
+            <LinearLoading message="Memuat dan menyinkronkan tugas sprint terbaru..." />
+          </div>
+        )}
+
+        {/* Info Sprint Point Banner (Sprint Point = Seberapa Aktif) */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/60 border border-blue-100/80 rounded-2xl p-3.5 mb-5 flex items-center justify-between gap-3 text-xs text-blue-900 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-7 h-7 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              SP
+            </span>
+            <p className="text-xs leading-relaxed text-blue-950">
+              <span className="font-bold">Info Sprint Point (SP):</span> Nilai poin pada setiap task menunjukkan <b>seberapa aktif dan kontributif</b> karyawan dalam menyelesaikan beban kerja sprint.
+            </p>
+          </div>
+          <span className="hidden sm:inline-block bg-white text-blue-700 font-bold px-3 py-1 rounded-xl border border-blue-200 shadow-2xs text-[11px] whitespace-nowrap">
+            Indikator Keaktifan
+          </span>
+        </div>
 
         {/* Toolbar & Filter Bar */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
@@ -953,7 +986,7 @@ export default function Tasks() {
                     <th className="py-3 px-2.5 whitespace-nowrap">Dibuat Oleh</th>
                     <th className="py-3 px-2.5 whitespace-nowrap">Assignee</th>
                     <th className="py-3 px-2.5 whitespace-nowrap">SLA / Deadline</th>
-                    <th className="py-3 px-2.5 whitespace-nowrap text-center">Point (SP)</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap text-center">Point (SP - Keaktifan)</th>
                     <th className="py-3 px-2.5 whitespace-nowrap text-center">Status</th>
                     <th className="py-3 px-2.5 whitespace-nowrap text-center">Aksi / Status</th>
                   </tr>
@@ -1405,6 +1438,7 @@ export default function Tasks() {
                   </span>
                   <div>
                     <h3 className="font-bold text-base text-gray-800">Atur Poin Task</h3>
+                    <p className="text-[11px] text-accent font-medium">Sprint Point mengukur seberapa aktif karyawan dalam sprint</p>
                     <p className="text-xs text-gray-400 font-mono">{selectedTaskForPoint.id} • {getAssigneeInfo(selectedTaskForPoint.assignee).name}</p>
                   </div>
                 </div>

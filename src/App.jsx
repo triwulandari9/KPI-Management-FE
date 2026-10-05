@@ -8,10 +8,7 @@ import Employees from "./pages/Employees";
 import Calendar from "./pages/Calendar";
 import KpiTracking from "./pages/KpiTracking";
 
-/**
- * Komponen Pembungkus Route Terlindungi (Protected Route)
- * Jika sesi kedaluwarsa (> 24 jam) atau belum login, otomatis redirect ke /login
- */
+
 function ProtectedRoute({ children }) {
   const { currentUser } = useAuth();
 
@@ -22,10 +19,6 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-/**
- * Route Publik untuk Login
- * Jika sudah login dan sesi masih aktif (< 24 jam), langsung arahkan ke Dashboard
- */
 function PublicLoginRoute() {
   const { currentUser } = useAuth();
 

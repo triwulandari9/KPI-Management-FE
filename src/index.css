@@ -8,6 +8,19 @@
   --color-accent-light: #E8F4FC;
 }
 
+@keyframes linear-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+
 @media print {
 
   /* Sembunyikan elemen non-cetak seperti header fixed dan sidebar */
