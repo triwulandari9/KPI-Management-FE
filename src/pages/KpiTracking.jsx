@@ -181,10 +181,10 @@ export default function KpiTracking() {
   // State Input Real-Time Karyawan untuk Setiap Rumus KPI (Inisialisasi bersih tanpa dummy)
   const [kpiInputs, setKpiInputs] = useState(CLEAN_INPUTS);
 
-  // Auto-scroll & highlight effect saat sub-menu KPI di sidebar diklik
+  // Auto-scroll & highlight effect HANYA saat ada hash dari klik submenu spesifik
   useEffect(() => {
-    const hash = location.hash || window.location.hash;
-    if (hash) {
+    const hash = location.hash;
+    if (hash && hash.startsWith("#kpi-")) {
       const targetId = hash.replace("#", "");
       const timer = setTimeout(() => {
         const el = document.getElementById(targetId);
@@ -195,10 +195,15 @@ export default function KpiTracking() {
             el.classList.remove("bg-blue-100", "ring-2", "ring-primary");
           }, 2500);
         }
+        // Bersihkan hash dari URL agar refresh atau kunjungan berikutnya tetap di posisi awal atas
+        window.history.replaceState(null, "", window.location.pathname);
       }, 350);
       return () => clearTimeout(timer);
+    } else {
+      // Tampilan awal selalu berada di atas secara normal
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
-  }, [location.hash, location.pathname, employeesList]);
+  }, [location.hash, location.pathname]);
 
   // Load Real Employees from Backend
   const fetchEmployees = async () => {

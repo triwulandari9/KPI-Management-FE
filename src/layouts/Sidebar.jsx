@@ -187,7 +187,11 @@ export default function Sidebar() {
             <div>
               <div
                 onClick={() => {
-                  if (!isKpiActive) navigate("/kpi");
+                  if (!isKpiActive) {
+                    navigate("/kpi");
+                  } else {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
                   setKpiExpanded(!kpiExpanded);
                 }}
                 className={`flex items-center justify-between px-3.5 py-3 rounded-xl text-[13px] font-medium whitespace-nowrap transition-all duration-200 cursor-pointer active:scale-[0.98] ${
