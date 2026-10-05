@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
   FaFileExport,
   FaUserTie,
@@ -160,6 +161,7 @@ const KPI_METRICS_TEMPLATE = [
 export default function KpiTracking() {
   const { collapsed } = useSidebar();
   const { currentUser } = useAuth();
+  const location = useLocation();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
   const [employeesList, setEmployeesList] = useState([]);
@@ -175,6 +177,25 @@ export default function KpiTracking() {
 
   // State Input Real-Time Karyawan untuk Setiap Rumus KPI (Inisialisasi bersih tanpa dummy)
   const [kpiInputs, setKpiInputs] = useState(CLEAN_INPUTS);
+
+  // Auto-scroll & highlight effect saat sub-menu KPI di sidebar diklik
+  useEffect(() => {
+    const hash = location.hash || window.location.hash;
+    if (hash) {
+      const targetId = hash.replace("#", "");
+      const timer = setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("bg-blue-100", "ring-2", "ring-primary", "transition-all", "duration-500");
+          setTimeout(() => {
+            el.classList.remove("bg-blue-100", "ring-2", "ring-primary");
+          }, 2500);
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash, location.pathname, employeesList]);
 
   // Load Real Employees from Backend
   const fetchEmployees = async () => {
@@ -998,7 +1019,11 @@ export default function KpiTracking() {
                     {computedMetrics.map((m) => {
                       const score = ((m.weight * m.achievedLevel) / 4).toFixed(1);
                       return (
-                        <tr key={m.no} className="hover:bg-blue-50/30 transition-colors">
+                        <tr
+                          key={m.no}
+                          id={`kpi-${m.no}`}
+                          className="hover:bg-blue-50/40 transition-all duration-300 scroll-mt-28"
+                        >
                           <td className="py-3.5 px-3 text-center font-bold text-gray-400 text-[11px]">{m.no}</td>
                           <td className="py-3.5 px-3">
                             <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-xl border ${m.categoryBg}`}>

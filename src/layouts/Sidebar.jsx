@@ -50,11 +50,14 @@ export default function Sidebar() {
     if (!isKpiActive) {
       navigate(`/kpi#${kpiId}`);
     } else {
+      navigate(`/kpi#${kpiId}`);
       const element = document.getElementById(kpiId);
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "center" });
-        element.classList.add("bg-blue-100/70");
-        setTimeout(() => element.classList.remove("bg-blue-100/70"), 1500);
+        element.classList.add("bg-blue-100", "ring-2", "ring-primary", "transition-all", "duration-500");
+        setTimeout(() => {
+          element.classList.remove("bg-blue-100", "ring-2", "ring-primary");
+        }, 2500);
       }
     }
   };
