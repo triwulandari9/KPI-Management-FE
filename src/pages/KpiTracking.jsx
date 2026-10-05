@@ -163,10 +163,13 @@ export default function KpiTracking() {
   const { currentUser } = useAuth();
   const location = useLocation();
   const isHR = currentUser?.role?.toUpperCase() === "HR";
+  const currentMonthIdx = new Date().getMonth(); // 0 = Jan, 9 = Okt, dst.
+  const defaultMonth = MONTH_TABS[currentMonthIdx] || "Oktober";
+  const defaultYear = String(new Date().getFullYear()) || "2026";
 
   const [employeesList, setEmployeesList] = useState([]);
-  const [activeTab, setActiveTab] = useState("Agustus");
-  const [selectedYear, setSelectedYear] = useState("2026");
+  const [activeTab, setActiveTab] = useState(defaultMonth);
+  const [selectedYear, setSelectedYear] = useState(defaultYear);
   const [selectedEmp, setSelectedEmp] = useState("");
   const [exportNotification, setExportNotification] = useState(false);
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
