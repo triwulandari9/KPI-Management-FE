@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FaUserPlus,
   FaEnvelope,
@@ -24,6 +24,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { employeeService } from "../services/employeeService";
 import { taskService } from "../services/taskService";
+import { authService } from "../services/authService";
 
 export default function Employees() {
   const { collapsed } = useSidebar();
@@ -31,6 +32,7 @@ export default function Employees() {
   const isHR = currentUser?.role?.toUpperCase() === "HR";
 
   const [employees, setEmployees] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState("All");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -57,36 +59,129 @@ export default function Employees() {
     avatar: "",
   });
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadEmployees() {
-      try {
-        const data = await employeeService.getEmployees();
-        if (isMounted && data) {
-          // Sinkronkan foto jika currentUser punya avatar terbaru
-          const syncedData = data.map((emp) => {
-            const isMatch =
-              currentUser &&
-              (currentUser.email === emp.email ||
-                currentUser._id === (emp._id || emp.id) ||
-                currentUser.id === (emp._id || emp.id) ||
-                currentUser.name?.toLowerCase() === emp.name?.toLowerCase());
-            if (isMatch && currentUser.avatar) {
-              return { ...emp, avatar: currentUser.avatar };
-            }
-            return emp;
-          });
-          setEmployees(syncedData);
-        }
-      } catch (err) {
-        console.error("Gagal load data employees:", err);
+  // Helper pencocokan task terhadap karyawan secara akurat
+  const isTaskForEmployee = (task, emp) => {
+    if (!task || !emp) return false;
+    const empId = String(emp._id || emp.id || "").toLowerCase().trim();
+    const empEmail = String(emp.email || "").toLowerCase().trim();
+    const empName = String(emp.name || "").toLowerCase().trim();
+    const empUsername = String(emp.username || "").toLowerCase().trim();
+
+    const matchVal = (val) => {
+      if (!val) return false;
+      if (typeof val === "object") {
+        const vId = String(val._id || val.id || "").toLowerCase().trim();
+        const vEmail = String(val.email || "").toLowerCase().trim();
+        const vName = String(val.name || val.username || "").toLowerCase().trim();
+        if (empId && vId && empId === vId) return true;
+        if (empEmail && vEmail && empEmail === vEmail) return true;
+        if (empName && vName && (empName === vName || empName.includes(vName) || vName.includes(empName))) return true;
+        if (empUsername && vName && empUsername === vName) return true;
+        return false;
       }
-    }
-    loadEmployees();
-    return () => {
-      isMounted = false;
+      const strVal = String(val).toLowerCase().trim();
+      if (!strVal) return false;
+      if (empId && strVal === empId) return true;
+      if (empEmail && strVal === empEmail) return true;
+      if (empName && (strVal === empName || strVal.includes(empName) || empName.includes(strVal))) return true;
+      if (empUsername && strVal === empUsername) return true;
+      return false;
     };
+
+    return (
+      matchVal(task.assignee) ||
+      matchVal(task.employee) ||
+      matchVal(task.assigneeId) ||
+      matchVal(task.employeeId) ||
+      matchVal(task.assigneeName) ||
+      matchVal(task.assignedTo)
+    );
+  };
+
+  // Fungsi hitung metrik real SP per karyawan dari data tasks BE
+  const computeEmployeeStats = (emp, allTasks = []) => {
+    const empTasks = allTasks.filter((t) => isTaskForEmployee(t, emp));
+    const totalTasks = empTasks.length;
+    const realSP = empTasks.reduce(
+      (sum, t) => sum + (Number(t.point || t.points || t.sp || t.sprintPoint || 0) || 0),
+      0
+    );
+
+    const doneTasks = empTasks.filter((t) => t.status === "Done");
+    const onTimeRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+
+    // Tentukan Level berdasarkan SP riil dari BE
+    let kpiLevel = 1;
+    let predicate = "Perlu Bimbingan";
+    if (realSP >= 80) {
+      kpiLevel = 4;
+      predicate = "Sangat Baik";
+    } else if (realSP >= 40) {
+      kpiLevel = 3;
+      predicate = "Baik";
+    } else if (realSP >= 15) {
+      kpiLevel = 2;
+      predicate = "Cukup";
+    } else if (realSP > 0) {
+      kpiLevel = 2;
+      predicate = "Cukup";
+    } else {
+      kpiLevel = 1;
+      predicate = "Belum Ada Task";
+    }
+
+    return {
+      sprintPoints: realSP,
+      totalTasks: totalTasks,
+      onTimeRate: totalTasks > 0 ? `${onTimeRate}%` : "0%",
+      kpiLevel: kpiLevel,
+      predicate: predicate,
+      slaBugRate: "100%",
+    };
+  };
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [empData, taskData] = await Promise.all([
+        employeeService.getEmployees({ _t: Date.now() }).catch(() => []),
+        taskService.getTasks({ _t: Date.now() }).catch(() => []),
+      ]);
+
+      const rawEmployees = Array.isArray(empData) ? empData : empData?.data || [];
+      const rawTasks = Array.isArray(taskData) ? taskData : taskData?.data || [];
+
+      setTasks(rawTasks);
+
+      const enrichedEmployees = rawEmployees.map((emp) => {
+        const stats = computeEmployeeStats(emp, rawTasks);
+
+        // Sinkronkan foto avatar jika currentUser punya avatar terbaru
+        const isSelf =
+          currentUser &&
+          (currentUser.email === emp.email ||
+            currentUser._id === (emp._id || emp.id) ||
+            currentUser.id === (emp._id || emp.id) ||
+            currentUser.name?.toLowerCase() === emp.name?.toLowerCase());
+
+        return {
+          ...emp,
+          avatar: isSelf && currentUser?.avatar ? currentUser.avatar : emp.avatar,
+          stats: stats,
+        };
+      });
+
+      setEmployees(enrichedEmployees);
+    } catch (err) {
+      console.error("Gagal memuat data karyawan & tasks:", err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [currentUser]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Listen for avatar updates to refresh employee list instantly (custom event)
   useEffect(() => {
@@ -119,22 +214,14 @@ export default function Employees() {
   useEffect(() => {
     const handleStorage = async (e) => {
       if (e.key === "kpi_avatar_updated" && e.newValue) {
-        // Refresh employee list to get updated avatar URLs
-        try {
-          const data = await employeeService.getEmployees({ _t: Date.now() });
-          if (data) {
-            setEmployees(data);
-          }
-        } catch (err) {
-          console.error("Failed to refresh employees after avatar update:", err);
-        }
+        loadData();
       }
     };
     window.addEventListener("storage", handleStorage);
     return () => {
       window.removeEventListener("storage", handleStorage);
     };
-  }, []);
+  }, [loadData]);
 
   // Format string Nama agar huruf pertama kapital
   const formatName = (str) => {
@@ -155,6 +242,7 @@ export default function Employees() {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3b82f6&color=fff&bold=true&rounded=true`;
   };
 
+  // Fungsi Kompresi Foto agar Base64 berukuran kecil (~20-40KB) dan aman di database
   const compressImage = (file, maxWidth = 400, maxHeight = 400, quality = 0.7) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -193,23 +281,20 @@ export default function Employees() {
     });
   };
 
+  // Handle upload & validasi foto avatar (Modal Tambah & Modal Edit)
   const handleAvatarChange = async (e, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Batasan format: JPG, JPEG, PNG
-    const validExtensions = ["jpg", "jpeg", "png"];
-    const fileExt = file.name.split(".").pop().toLowerCase();
     const validTypes = ["image/jpeg", "image/jpg", "image/png"];
-
-    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExt)) {
-      setAvatarError("Format file tidak didukung! Harap upload foto format JPG, JPEG, atau PNG.");
+    if (!validTypes.includes(file.type)) {
+      setAvatarError("Format file harus JPG, JPEG, atau PNG.");
       return;
     }
 
-    // Batasan ukuran: Maks 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      setAvatarError("Ukuran foto terlalu besar! Maksimal ukuran file 10MB.");
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setAvatarError("Ukuran foto maksimal 2MB.");
       return;
     }
 
@@ -222,7 +307,6 @@ export default function Employees() {
         setNewEmployee((prev) => ({ ...prev, avatar: base64Url }));
       }
     } catch {
-      // Fallback jika kompresi canvas error
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64Url = reader.result;
@@ -250,7 +334,10 @@ export default function Employees() {
 
     try {
       const created = await employeeService.createEmployee(payload);
-      setEmployees((prev) => [created || payload, ...prev]);
+      const createdStats = computeEmployeeStats(created || payload, tasks);
+      const newEmpWithStats = { ...(created || payload), stats: createdStats };
+
+      setEmployees((prev) => [newEmpWithStats, ...prev]);
       setIsModalOpen(false);
       setAvatarError("");
       setNewEmployee({
@@ -262,11 +349,12 @@ export default function Employees() {
       });
     } catch (err) {
       console.error("Gagal menambah karyawan:", err);
-      // Fallback local jika server gagal
-      setEmployees((prev) => [
-        { ...payload, id: `EMP-${Date.now().toString().slice(-3)}` },
-        ...prev,
-      ]);
+      const localEmp = {
+        ...payload,
+        id: `EMP-${Date.now().toString().slice(-3)}`,
+        stats: computeEmployeeStats(payload, tasks),
+      };
+      setEmployees((prev) => [localEmp, ...prev]);
       setIsModalOpen(false);
       setAvatarError("");
       setNewEmployee({
@@ -347,14 +435,19 @@ export default function Employees() {
       }
 
       setEmployees((prev) =>
-        prev.map((emp) =>
-          (emp._id || emp.id) === empId
-            ? { ...emp, ...editFormData, ...(updated || {}) }
-            : emp
-        )
+        prev.map((emp) => {
+          if ((emp._id || emp.id) === empId) {
+            const merged = { ...emp, ...editFormData, ...(updated || {}) };
+            return { ...merged, stats: computeEmployeeStats(merged, tasks) };
+          }
+          return emp;
+        })
       );
       if (selectedEmployee && (selectedEmployee._id || selectedEmployee.id) === empId) {
-        setSelectedEmployee((prev) => ({ ...prev, ...editFormData, ...(updated || {}) }));
+        setSelectedEmployee((prev) => {
+          const merged = { ...prev, ...editFormData, ...(updated || {}) };
+          return { ...merged, stats: computeEmployeeStats(merged, tasks) };
+        });
       }
       if (isSelf) {
         updateUserProfile?.({ avatar: editFormData.avatar });
@@ -400,7 +493,7 @@ export default function Employees() {
         {/* State Loading Linear Data Karyawan */}
         {isLoading && (
           <div className="mb-4">
-            <LinearLoading message="Memuat daftar karyawan dan menyinkronkan data profil dari server..." />
+            <LinearLoading message="Memuat daftar karyawan dan menghitung Sprint Points real dari server..." />
           </div>
         )}
 
@@ -464,10 +557,12 @@ export default function Employees() {
                         ? "bg-green-50 text-green-600 border-green-200"
                         : emp.stats?.kpiLevel === 3
                         ? "bg-blue-50 text-blue-600 border-blue-200"
-                        : "bg-amber-50 text-amber-600 border-amber-200"
+                        : emp.stats?.kpiLevel === 2
+                        ? "bg-amber-50 text-amber-600 border-amber-200"
+                        : "bg-gray-50 text-gray-600 border-gray-200"
                     }`}
                   >
-                    <FaAward size={10} /> Level {emp.stats?.kpiLevel ?? 4}
+                    <FaAward size={10} /> Level {emp.stats?.kpiLevel ?? 1}
                   </span>
                 </div>
 
@@ -483,7 +578,7 @@ export default function Employees() {
                   </div>
                 </div>
 
-                {/* Performance / KPI Stats Mini Bar */}
+                {/* Performance / KPI Stats Mini Bar (REAL SP & REAL TASKS) */}
                 <div className="grid grid-cols-3 gap-2 text-center my-4 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
                   <div>
                     <p className="text-[10px] text-gray-400">Sprint Points</p>
@@ -495,7 +590,7 @@ export default function Employees() {
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400">On Time</p>
-                    <p className="text-sm font-bold text-green-600">{emp.stats?.onTimeRate ?? "100%"}</p>
+                    <p className="text-sm font-bold text-green-600">{emp.stats?.onTimeRate ?? "0%"}</p>
                   </div>
                 </div>
               </div>
@@ -579,20 +674,26 @@ export default function Employees() {
                 {/* KPI Metrics Breakdown */}
                 <div>
                   <h4 className="font-bold text-xs text-gray-700 mb-2 flex items-center gap-1.5">
-                    <FaChartLine className="text-primary" /> Rincian Metrik KPI Bulan Ini
+                    <FaChartLine className="text-primary" /> Rincian Metrik KPI Real-Time
                   </h4>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
                       <span className="text-gray-600">Pencapaian Level KPI</span>
-                      <span className="font-bold text-green-600">Level {selectedEmployee.stats?.kpiLevel ?? 4} (Sangat Baik)</span>
+                      <span className="font-bold text-green-600">
+                        Level {selectedEmployee.stats?.kpiLevel ?? 1} ({selectedEmployee.stats?.predicate || "Cukup"})
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                      <span className="text-gray-600">Akumulasi Sprint Point (SP)</span>
+                      <span className="text-gray-600">Akumulasi Real Sprint Point (SP)</span>
                       <span className="font-bold text-accent">{selectedEmployee.stats?.sprintPoints ?? 0} SP</span>
                     </div>
                     <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                      <span className="text-gray-600">On Time Delivery (Fitur Tepat Waktu)</span>
-                      <span className="font-bold text-gray-800">{selectedEmployee.stats?.onTimeRate ?? "100%"}</span>
+                      <span className="text-gray-600">Total Task Ditugaskan</span>
+                      <span className="font-bold text-gray-800">{selectedEmployee.stats?.totalTasks ?? 0} Task</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                      <span className="text-gray-600">On Time Delivery (Penyelesaian Task)</span>
+                      <span className="font-bold text-gray-800">{selectedEmployee.stats?.onTimeRate ?? "0%"}</span>
                     </div>
                     <div className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
                       <span className="text-gray-600">SLA Ticket Bug Resolution</span>
@@ -664,7 +765,6 @@ export default function Employees() {
               </div>
 
               <form onSubmit={handleCreateEmployee} className="mt-4 flex flex-col gap-3.5 text-xs">
-                {/* Upload Foto Profil (JPG, JPEG, PNG) */}
                 <div className="flex flex-col gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
                   <label className="font-semibold text-gray-700">Foto Profil Karyawan (Opsional)</label>
                   <div className="flex items-center gap-3.5">
@@ -700,90 +800,86 @@ export default function Employees() {
                           </button>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 10MB)</p>
+                      <span className="text-[10px] text-gray-400 block mt-1">Maksimal 2MB (JPG, PNG)</span>
                     </div>
                   </div>
-                  {avatarError && (
-                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 p-2 rounded-xl border border-red-200">
-                      <FaExclamationCircle className="shrink-0" />
-                      <span>{avatarError}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">
-                    Nama Lengkap <span className="text-red-500">*</span>
-                  </label>
+                  <label className="font-semibold text-gray-700 block mb-1">Nama Lengkap</label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Ahmad Fauzi"
+                    placeholder="Contoh: Tri Wulandari"
                     value={newEmployee.name}
                     onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">
-                    Email Resmi <span className="text-red-500">*</span>
-                  </label>
+                  <label className="font-semibold text-gray-700 block mb-1">Email Resmi</label>
                   <input
                     type="email"
                     required
-                    placeholder="nama@assist.id"
+                    placeholder="nama@perusahaan.com"
                     value={newEmployee.email}
                     onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Posisi / Role</label>
-                  <select
-                    value={newEmployee.role}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, role: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer"
-                  >
-                    <option value="Frontend Developer">Frontend Developer</option>
-                    <option value="Backend Developer">Backend Developer</option>
-                    <option value="UI/UX Designer">UI/UX Designer</option>
-                    <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
-                    <option value="Product Owner (PO)">Product Owner (PO)</option>
-                    <option value="DevOps Engineer">DevOps Engineer</option>
-                    <option value="Mobile Developer">Mobile Developer</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">Role / Jabatan</label>
+                    <select
+                      value={newEmployee.role}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, role: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
+                    >
+                      <option value="Frontend Developer">Frontend Dev</option>
+                      <option value="Backend Developer">Backend Dev</option>
+                      <option value="UI/UX Designer">UI/UX Designer</option>
+                      <option value="Quality Assurance">QA Engineer</option>
+                      <option value="Product Owner">Product Owner</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">Divisi</label>
+                    <select
+                      value={newEmployee.department}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
+                    >
+                      <option value="Engineering">Engineering</option>
+                      <option value="Product">Product</option>
+                      <option value="Design">Design</option>
+                      <option value="Quality Assurance">Quality Assurance</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Divisi / Departemen</label>
-                  <select
-                    value={newEmployee.department}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Product & Design">Product & Design</option>
-                    <option value="Quality Control">Quality Control</option>
-                    <option value="Product Management">Product Management</option>
-                  </select>
-                </div>
+                {avatarError && (
+                  <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs flex items-center gap-2 border border-red-100">
+                    <FaExclamationCircle className="shrink-0" />
+                    <span>{avatarError}</span>
+                  </div>
+                )}
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 mt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setIsModalOpen(false);
                       setAvatarError("");
                     }}
-                    className="px-4 py-2 rounded-xl font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold transition-all cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
                   >
                     Simpan Karyawan
                   </button>
@@ -793,25 +889,20 @@ export default function Employees() {
           </div>
         )}
 
-        {/* MODAL 3: Edit Profil & Role Karyawan (HR: Semua Field | Karyawan: Foto Saja) */}
+        {/* MODAL 3: Edit Karyawan & Ganti Foto */}
         {editingEmployee && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-primary-light text-primary flex items-center justify-center">
-                    {isPhotoOnlyMode ? <FaCamera size={16} /> : <FaEdit size={16} />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base sm:text-lg text-gray-800">
-                      {isPhotoOnlyMode ? "Ubah Foto Profil Saya" : "Edit Profil & Role"}
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      {isPhotoOnlyMode
-                        ? "Upload foto profil baru Anda (.jpg, .jpeg, .png)"
-                        : "Ubah posisi kerja dan divisi karyawan"}
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="font-bold text-lg text-gray-800">
+                    {isPhotoOnlyMode ? "Ganti Foto Profil" : "Edit Informasi Karyawan"}
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    {isPhotoOnlyMode
+                      ? "Perbarui foto akun Anda agar tampil di seluruh sistem"
+                      : "Perbarui jabatan, divisi, nama, dan foto profil"}
+                  </p>
                 </div>
                 <button
                   onClick={() => {
@@ -825,17 +916,19 @@ export default function Employees() {
               </div>
 
               <form onSubmit={handleUpdateEmployee} className="mt-4 flex flex-col gap-3.5 text-xs">
-                {/* Upload Foto Profil */}
+                {/* Upload / Ganti Foto Profil */}
                 <div className="flex flex-col gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
                   <label className="font-semibold text-gray-700">Foto Profil</label>
                   <div className="flex items-center gap-3.5">
                     <img
                       src={
                         editFormData.avatar ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(editFormData.name || "User")}&background=3b82f6&color=fff&bold=true`
+                        (editFormData.name
+                          ? `https://ui-avatars.com/api/?name=${encodeURIComponent(editFormData.name)}&background=3b82f6&color=fff&bold=true`
+                          : "https://ui-avatars.com/api/?name=User&background=3b82f6&color=fff&bold=true")
                       }
                       alt="Preview"
-                      className="w-14 h-14 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
+                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-primary/20 shrink-0 bg-white"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -853,123 +946,103 @@ export default function Employees() {
                             type="button"
                             onClick={() => setEditFormData((prev) => ({ ...prev, avatar: "" }))}
                             className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Hapus foto (gunakan avatar inisial)"
+                            title="Hapus foto profil"
                           >
                             <FaTrashAlt size={12} />
                           </button>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Format: <b>JPG, JPEG, PNG</b> (Maks. 10MB)</p>
+                      <span className="text-[10px] text-gray-400 block mt-1">Format JPG/PNG, Maksimal 2MB</span>
                     </div>
                   </div>
-                  {avatarError && (
-                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 p-2 rounded-xl border border-red-200">
-                      <FaExclamationCircle className="shrink-0" />
-                      <span>{avatarError}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Jika Mode Karyawan (Foto Saja): Tampilkan info read-only */}
-                {isPhotoOnlyMode ? (
-                  <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100 flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-400">Nama:</span>
-                      <span className="font-bold text-gray-800">{editFormData.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-400">Email:</span>
-                      <span className="font-semibold text-gray-700">{editFormData.email}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-400">Jabatan & Divisi:</span>
-                      <span className="font-semibold text-primary">{editFormData.role} • {editFormData.department}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 italic pt-1 border-t border-gray-200/60 mt-1">
-                      *Perubahan nama, jabatan, dan divisi hanya dapat dilakukan oleh HR.
-                    </p>
-                  </div>
-                ) : (
-                  /* Jika Mode HR: Semua field dapat diedit */
+                {!isPhotoOnlyMode ? (
                   <>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">
-                        Nama Lengkap <span className="text-red-500">*</span>
-                      </label>
+                      <label className="font-semibold text-gray-700 block mb-1">Nama Lengkap</label>
                       <input
                         type="text"
                         required
                         value={editFormData.name}
                         onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-semibold text-gray-800"
                       />
                     </div>
 
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">
-                        Email Resmi <span className="text-red-500">*</span>
-                      </label>
+                      <label className="font-semibold text-gray-700 block mb-1">Email Resmi</label>
                       <input
                         type="email"
                         required
                         value={editFormData.email}
                         onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-light"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-gray-600"
                       />
                     </div>
 
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Posisi / Role Kerja</label>
-                      <select
-                        value={editFormData.role}
-                        onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
-                      >
-                        <option value="Frontend Developer">Frontend Developer</option>
-                        <option value="Backend Developer">Backend Developer</option>
-                        <option value="UI/UX Designer">UI/UX Designer</option>
-                        <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
-                        <option value="Product Owner (PO)">Product Owner (PO)</option>
-                        <option value="DevOps Engineer">DevOps Engineer</option>
-                        <option value="Mobile Developer">Mobile Developer</option>
-                        <option value="Engineering Manager">Engineering Manager</option>
-                        <option value="HR / People Operations">HR / People Operations</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Divisi / Departemen</label>
-                      <select
-                        value={editFormData.department}
-                        onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-light cursor-pointer font-medium"
-                      >
-                        <option value="Engineering">Engineering</option>
-                        <option value="Product & Design">Product & Design</option>
-                        <option value="Quality Control">Quality Control</option>
-                        <option value="Product Management">Product Management</option>
-                        <option value="Human Resources">Human Resources</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-semibold text-gray-700 block mb-1">Role / Posisi</label>
+                        <select
+                          value={editFormData.role}
+                          onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
+                        >
+                          <option value="Frontend Developer">Frontend Dev</option>
+                          <option value="Backend Developer">Backend Dev</option>
+                          <option value="UI/UX Designer">UI/UX Designer</option>
+                          <option value="Quality Assurance">QA Engineer</option>
+                          <option value="Product Owner">Product Owner</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-gray-700 block mb-1">Divisi</label>
+                        <select
+                          value={editFormData.department}
+                          onChange={(e) => setEditFormData({ ...editFormData, department: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
+                        >
+                          <option value="Engineering">Engineering</option>
+                          <option value="Product">Product</option>
+                          <option value="Design">Design</option>
+                          <option value="Quality Assurance">Quality Assurance</option>
+                        </select>
+                      </div>
                     </div>
                   </>
+                ) : (
+                  <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl text-xs text-blue-800">
+                    <p className="font-semibold mb-0.5">Akun Anda: {editFormData.name}</p>
+                    <p className="text-[11px] text-blue-600">
+                      Anda sedang mengganti foto profil untuk akun ini. Foto akan disinkronkan ke seluruh sistem dan navigasi atas.
+                    </p>
+                  </div>
                 )}
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                {avatarError && (
+                  <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs flex items-center gap-2 border border-red-100">
+                    <FaExclamationCircle className="shrink-0" />
+                    <span>{avatarError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 mt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setEditingEmployee(null);
                       setAvatarError("");
                     }}
-                    className="px-4 py-2 rounded-xl font-semibold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold transition-all cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
                   >
-                    {isPhotoOnlyMode ? "Simpan Foto Profil" : "Simpan Perubahan"}
+                    Simpan Perubahan
                   </button>
                 </div>
               </form>
