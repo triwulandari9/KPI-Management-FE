@@ -89,7 +89,7 @@ const KPI_METRICS_TEMPLATE = [
     frequency: "Monthly",
     weight: 15,
     levels: { l1: "> 10", l2: "10", l3: "5", l4: "0" },
-    monthlyTarget: "5 Bug",
+    monthlyTarget: "5",
   },
   {
     no: 4,
@@ -102,7 +102,7 @@ const KPI_METRICS_TEMPLATE = [
     frequency: "Yearly",
     weight: 5,
     levels: { l1: "Annual: 0", l2: "Annual: 12", l3: "Annual: 24", l4: "Annual: 36" },
-    monthlyTarget: "2 Item",
+    monthlyTarget: "2",
   },
   {
     no: 5,
@@ -128,7 +128,7 @@ const KPI_METRICS_TEMPLATE = [
     frequency: "Monthly",
     weight: 15,
     levels: { l1: "> 64 Jam", l2: "64 Jam", l3: "48 Jam", l4: "< 48 Jam" },
-    monthlyTarget: "48 Jam",
+    monthlyTarget: "48",
   },
   {
     no: 7,
@@ -154,7 +154,7 @@ const KPI_METRICS_TEMPLATE = [
     frequency: "Yearly",
     weight: 15,
     levels: { l1: "< 672 SP", l2: "672 SP", l3: "1056 SP", l4: "> 1440 SP" },
-    monthlyTarget: "88 SP",
+    monthlyTarget: "88",
   },
 ];
 
@@ -406,69 +406,89 @@ export default function KpiTracking() {
 
       switch (kpi.no) {
         case 1: {
+          // 1. On Time Delivery (Target: 90%)
           const onTime = Number(inp.onTime) || 0;
           const total = Number(inp.total) || 0;
           const percent = total > 0 ? (onTime / total) * 100 : 0;
-          actual = `${percent.toFixed(1)}%`;
-          atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
+          actual = `${Math.round(percent)}%`;
+          // A/T: (Actual / 90) * 100 (Bisa lebih dari 100%, contoh 100% / 90% = 111%)
+          const atVal = total > 0 ? Math.round((percent / 90) * 100) : 0;
+          atPercent = `${atVal}%`;
           achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 80 ? 2 : 1;
           break;
         }
         case 2: {
+          // 2. SLA Ticket Bug (Target: 90%)
           const onSla = Number(inp.onSla) || 0;
           const total = Number(inp.total) || 0;
           const percent = total > 0 ? (onSla / total) * 100 : 0;
-          actual = `${percent.toFixed(1)}%`;
-          atPercent = `${((percent / 90) * 100).toFixed(1)}%`;
+          actual = `${Math.round(percent)}%`;
+          // A/T: (Actual / 90) * 100 (Bisa lebih dari 100%, contoh 100% / 90% = 111%)
+          const atVal = total > 0 ? Math.round((percent / 90) * 100) : 0;
+          atPercent = `${atVal}%`;
           achievedLevel = percent >= 95 ? 4 : percent >= 90 ? 3 : percent >= 85 ? 2 : 1;
           break;
         }
         case 3: {
+          // 3. Production Bug Density (Target: 5)
           const bug = Number(inp.bugCount) || 0;
-          actual = `${bug} Bug`;
-          atPercent = bug === 0 ? "100.0%" : `${Math.max(0, 100 - (bug / 5) * 20).toFixed(1)}%`;
-          achievedLevel = bug === 0 ? 4 : bug <= 5 ? 3 : bug <= 10 ? 2 : 1;
+          actual = `${bug}`;
+          const atRatio = (bug / 5);
+          atPercent = `${atRatio.toFixed(1)}`;
+          achievedLevel = bug <= 5 ? 4 : bug <= 10 ? 2 : 1;
           break;
         }
         case 4: {
+          // 4. Continuous Improvement (Target: 2)
           const count = Number(inp.count) || 0;
-          actual = `${count} Item`;
-          atPercent = `${((count / 2) * 100).toFixed(1)}%`;
-          achievedLevel = count >= 3 ? 4 : count >= 2 ? 3 : count >= 1 ? 2 : 1;
+          actual = `${count}`;
+          const atRatio = (count / 2);
+          atPercent = `${atRatio.toFixed(1)}`;
+          achievedLevel = count >= 3 ? 4 : count >= 1 ? 3 : 1;
           break;
         }
         case 5: {
+          // 5. Tech Debt Completion (Target: 60%)
           const done = Number(inp.done) || 0;
           const total = Number(inp.total) || 0;
-          const percent = total === 0 && done === 0 ? 100 : total > 0 ? (done / total) * 100 : 0;
-          actual = `${percent.toFixed(1)}%`;
-          atPercent = `${((percent / 60) * 100).toFixed(1)}%`;
-          achievedLevel = percent >= 80 ? 4 : percent >= 60 ? 3 : percent >= 40 ? 2 : 1;
+          const percent = total > 0 ? (done / total) * 100 : (done > 0 ? 100 : 0);
+          actual = `${Math.round(percent)}%`;
+          // A/T: (Actual / 60) * 100 (Bisa lebih dari 100%, contoh 70% / 60% = 117%)
+          const atVal = Math.round((percent / 60) * 100);
+          atPercent = `${atVal}%`;
+          achievedLevel = percent >= 80 ? 4 : percent >= 60 ? 4 : percent >= 40 ? 2 : 1;
           break;
         }
         case 6: {
+          // 6. Task Completion Rate (Target: 48 Jam)
           const hrs = Number(inp.hours) || 0;
-          actual = `${hrs} Jam`;
-          atPercent = hrs > 0 ? `${((48 / hrs) * 100).toFixed(1)}%` : "0.0%";
-          achievedLevel = hrs > 0 && hrs < 48 ? 4 : hrs === 48 ? 3 : hrs > 0 && hrs <= 64 ? 2 : 1;
+          actual = `${hrs}`;
+          const atRatio = hrs > 0 ? (hrs / 48) : 0;
+          atPercent = `${atRatio.toFixed(2)}`;
+          achievedLevel = hrs <= 48 ? 4 : hrs <= 64 ? 2 : 1;
           break;
         }
         case 7: {
+          // 7. Task Backward Rate (Target: 30%)
           const rej = Number(inp.rejectCount) || 0;
           const total = Number(inp.totalTasks) || 0;
           const percent = total > 0 ? (rej / total) * 100 : 0;
-          actual = `${percent.toFixed(1)}%`;
-          atPercent = total === 0 ? "100.0%" : percent <= 20 ? "100.0%" : `${((30 / Math.max(percent, 1)) * 100).toFixed(1)}%`;
-          achievedLevel = total === 0 ? 4 : percent < 20 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
+          actual = `${Math.round(percent)}%`;
+          // A/T: (Actual / 30) * 100 (contoh 25% / 30% = 83%)
+          const atVal = Math.round((percent / 30) * 100);
+          atPercent = `${atVal}%`;
+          achievedLevel = percent <= 25 ? 4 : percent <= 30 ? 3 : percent <= 50 ? 2 : 1;
           break;
         }
         case 8: {
+          // 8. Sprint Point (Target: 88 SP)
           const sp = Number(inp.spEarned) || 0;
           const target = Number(inp.spTarget) || 88;
           const percent = target > 0 ? (sp / target) * 100 : 0;
-          actual = `${sp} SP`;
-          atPercent = `${percent.toFixed(1)}%`;
-          achievedLevel = sp >= 120 ? 4 : sp >= 88 ? 3 : sp >= 56 ? 2 : 1;
+          actual = `${sp}`;
+          // A/T: (Actual SP / Target 88) * 100 (Bisa lebih dari 100%, contoh 98 / 88 = 111%)
+          atPercent = `${Math.round(percent)}%`;
+          achievedLevel = sp >= 88 ? 4 : sp >= 56 ? 2 : 1;
           break;
         }
         default:
@@ -479,15 +499,14 @@ export default function KpiTracking() {
     });
 
     const weightSum = metrics.reduce((acc, curr) => acc + curr.weight, 0);
-    const averageLevel = (
-      metrics.reduce((acc, curr) => acc + curr.achievedLevel, 0) / metrics.length
-    ).toFixed(1);
+    const rawAverage = metrics.reduce((acc, curr) => acc + curr.achievedLevel, 0) / metrics.length;
+    // Level rata-rata bulat utuh tanpa koma (1, 2, 3, 4)
+    const averageLevel = Math.round(rawAverage);
 
     let predicate = "Sangat Baik (A)";
-    const numAvg = parseFloat(averageLevel);
-    if (numAvg >= 3.5) predicate = "Sangat Baik (A)";
-    else if (numAvg >= 3.0) predicate = "Baik (B)";
-    else if (numAvg >= 2.0) predicate = "Cukup (C)";
+    if (averageLevel >= 4) predicate = "Sangat Baik (A)";
+    else if (averageLevel === 3) predicate = "Baik (B)";
+    else if (averageLevel === 2) predicate = "Cukup (C)";
     else predicate = "Perlu Peningkatan (D)";
 
     return { metrics, weightSum, averageLevel, predicate };
@@ -497,11 +516,11 @@ export default function KpiTracking() {
     return calculateMetricsForInputs(kpiInputs).metrics;
   }, [kpiInputs]);
 
-  // Hitung Skor Rata-rata & Level Dominan untuk Karyawan yang Sedang Dipilih
+  // Hitung Skor Rata-rata & Level Dominan untuk Karyawan yang Sedang Dipilih (Bulat Tanpa Koma)
   const totalWeight = computedMetrics.reduce((acc, curr) => acc + curr.weight, 0);
-  const avgLevel = (
+  const avgLevel = Math.round(
     computedMetrics.reduce((acc, curr) => acc + curr.achievedLevel, 0) / computedMetrics.length
-  ).toFixed(1);
+  );
   const totalLevel4 = computedMetrics.filter((m) => m.achievedLevel === 4).length;
 
   // Unduh File Excel Laporan KPI (.xlsx) Multi-Sheet Resmi PT. JAGA ANUGERAH GIAT ASA (ASSIST.ID)
