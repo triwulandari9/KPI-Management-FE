@@ -1036,8 +1036,10 @@ export default function KpiTracking() {
                           </td>
                           <td className="py-3.5 px-3 text-center font-semibold text-gray-700">{m.monthlyTarget}</td>
                           <td className="py-3.5 px-3 text-center font-bold text-gray-800">{m.weight}%</td>
-                          <td className="py-3.5 px-3 text-center font-bold text-primary bg-primary-light/20 rounded-xl">
-                            {m.actual}
+                          <td className="py-3.5 px-3 text-center">
+                            <span className="inline-flex items-center justify-center font-bold text-primary bg-primary-light/50 border border-primary/25 px-2.5 py-1 rounded-xl text-xs shadow-2xs min-w-[60px]">
+                              {m.actual}
+                            </span>
                           </td>
                           <td className="py-3.5 px-3 text-center font-bold text-gray-700">{m.atPercent}</td>
                           <td className="py-3.5 px-3 text-center">
